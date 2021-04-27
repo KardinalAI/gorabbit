@@ -26,10 +26,10 @@ You can declare a new queue:
 
 ```go
 queue := gorabbit.QueueConfig{
-Name:      "my_queue",
-Durable:   true,
-Exclusive: false,
-Bindings:  nil,
+    Name:      "my_queue",
+    Durable:   true,
+    Exclusive: false,
+    Bindings:  nil,
 }
 ```
 
@@ -42,8 +42,8 @@ You can declare a new binding:
 
 ```go
 binding := gorabbit.BindingConfig{
-RoutingKey: "routing.key",
-Exchange:   "exchange_name",
+    RoutingKey: "routing.key",
+    Exchange:   "exchange_name",
 }
 ```
 
@@ -54,9 +54,9 @@ You can declare a new exchange:
 
 ```go
 exchange := gorabbit.ExchangeConfig{
-Name:      "exchange_name",
-Type:      gorabbit.Topic,
-Persisted: true,
+    Name:      "exchange_name",
+    Type:      gorabbit.Topic,
+    Persisted: true,
 }
 ```
 
@@ -69,10 +69,10 @@ setup. This can be simplified by simply calling the SetupMQTT function that the 
 
 ```go
 clientConfig := gorabbit.ClientConfig{
-Host:     "localhost",
-Port:     5672,
-Username: "guest",
-Password: "guest",
+    Host:     "localhost",
+    Port:     5672,
+    Username: "guest",
+    Password: "guest",
 }
 
 ...
@@ -80,7 +80,7 @@ Password: "guest",
 err := gorabbit.SetupMQTT(clientConfig, exchanges, &queues)
 
 if err != nil {
-panic(err.Error())
+    panic(err.Error())
 }
 
 ```
@@ -89,49 +89,49 @@ panic(err.Error())
 
 ```go
 clientConfig := gorabbit.ClientConfig{
-Host:     "localhost",
-Port:     5672,
-Username: "guest",
-Password: "guest",
+    Host:     "localhost",
+    Port:     5672,
+    Username: "guest",
+    Password: "guest",
 }
 payloadExchangeConfig := gorabbit.ExchangeConfig{
-Name:      "payloads_topic",
-Type:      gorabbit.Topic,
-Persisted: true,
+    Name:      "payloads_topic",
+    Type:      gorabbit.Topic,
+    Persisted: true,
 }
 
 eventExchangeConfig := gorabbit.ExchangeConfig{
-Name:      "events_topic",
-Type:      gorabbit.Topic,
-Persisted: true,
+    Name:      "events_topic",
+    Type:      gorabbit.Topic,
+    Persisted: true,
 }
 
 payloadBindings := []gorabbit.BindingConfig{
-{
-RoutingKey: "*.payload.#",
-Exchange:   payloadExchangeConfig.Name,
-},
+    {
+        RoutingKey: "*.payload.#",
+        Exchange:   payloadExchangeConfig.Name,
+    },
 }
 
 eventBindings := []gorabbit.BindingConfig{
-{
-RoutingKey: "*.event.#",
-Exchange:   eventExchangeConfig.Name,
-},
+    {
+        RoutingKey: "*.event.#",
+        Exchange:   eventExchangeConfig.Name,
+    },
 }
 
 payloadQueueConfig := gorabbit.QueueConfig{
-Name:      "payload_queue",
-Durable:   true,
-Exclusive: false,
-Bindings:  &payloadBindings,
+    Name:      "payload_queue",
+    Durable:   true,
+    Exclusive: false,
+    Bindings:  &payloadBindings,
 }
 
 eventQueueConfig := gorabbit.QueueConfig{
-Name:      "event_queue",
-Durable:   true,
-Exclusive: false,
-Bindings:  &eventBindings,
+    Name:      "event_queue",
+    Durable:   true,
+    Exclusive: false,
+    Bindings:  &eventBindings,
 }
 
 exchanges := []gorabbit.ExchangeConfig{payloadExchangeConfig, eventExchangeConfig}
@@ -140,7 +140,7 @@ queues := []gorabbit.QueueConfig{payloadQueueConfig, eventQueueConfig}
 err := gorabbit.SetupMQTT(clientConfig, exchanges, &queues)
 
 if err != nil {
-panic(err.Error())
+    panic(err.Error())
 }
 ```
 
@@ -153,16 +153,16 @@ server.
 var client gorabbit.MQTTClient
 
 clientConfig := gorabbit.ClientConfig{
-Host:     "localhost",
-Port:     5672,
-Username: "guest",
-Password: "guest",
+    Host:     "localhost",
+    Port:     5672,
+    Username: "guest",
+    Password: "guest",
 }
 
 c, err := gorabbit.NewMQTTClient(clientConfig)
 
 if err != nil {
-panic(err.Error())
+    panic(err.Error())
 }
 
 client = c
