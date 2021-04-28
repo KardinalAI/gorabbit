@@ -29,11 +29,12 @@ go env -w GONOSUMDB="gitlab.kardinal.ai/*"
 
 This module contains 3 main functionalities:
 
-* Queues, Exchangers and Bindings Configurator
+* Queues, Exchangers and Bindings Configurator from Struct
+* Queues, Exchangers and Bindings Configurator from YML
 * Event Sender
 * Event Subscriber
 
-### Queues, Exchangers and Bindings Configurator
+### Queues, Exchangers and Bindings Configurator from Struct
 
 You can declare a new queue:
 
@@ -101,59 +102,139 @@ if err != nil {
 #### Complete Example
 
 ```go
-clientConfig := gorabbit.ClientConfig{
-    Host:     "localhost",
-    Port:     5672,
-    Username: "guest",
-    Password: "guest",
+package main
+
+import (
+	"gitlab.kardinal.ai/aelkhou/gorabbit"
+)
+
+func main() {
+	clientConfig := gorabbit.ClientConfig{
+		Host:     "localhost",
+		Port:     5672,
+		Username: "guest",
+		Password: "guest",
+	}
+
+	payloadExchangeConfig := gorabbit.ExchangeConfig{
+		Name:      "payloads_topic",
+		Type:      "topic",
+		Persisted: true,
+	}
+
+	eventExchangeConfig := gorabbit.ExchangeConfig{
+		Name:      "events_topic",
+		Type:      "topic",
+		Persisted: true,
+	}
+
+	payloadBindings := []gorabbit.BindingConfig{
+		{
+			RoutingKey: "*.payload.#",
+			Exchange:   payloadExchangeConfig.Name,
+		},
+	}
+
+	eventBindings := []gorabbit.BindingConfig{
+		{
+			RoutingKey: "*.event.#",
+			Exchange:   eventExchangeConfig.Name,
+		},
+	}
+
+	payloadQueueConfig := gorabbit.QueueConfig{
+		Name:      "payload_queue",
+		Durable:   true,
+		Exclusive: false,
+		Bindings:  &payloadBindings,
+	}
+
+	eventQueueConfig := gorabbit.QueueConfig{
+		Name:      "event_queue",
+		Durable:   true,
+		Exclusive: false,
+		Bindings:  &eventBindings,
+	}
+
+	exchanges := []gorabbit.ExchangeConfig{payloadExchangeConfig, eventExchangeConfig}
+	queues := []gorabbit.QueueConfig{payloadQueueConfig, eventQueueConfig}
+
+	serverConfig := gorabbit.RabbitServerConfig{
+		Exchanges: exchanges,
+		Queues: queues,
+	}
+
+	err := gorabbit.SetupMQTT(clientConfig, serverConfig)
+
+	if err != nil {
+		panic(err.Error())
+	}
 }
-payloadExchangeConfig := gorabbit.ExchangeConfig{
-    Name:      "payloads_topic",
-    Type:      "topic",
-    Persisted: true,
-}
+```
 
-eventExchangeConfig := gorabbit.ExchangeConfig{
-    Name:      "events_topic",
-    Type:      "topic",
-    Persisted: true,
-}
+### Queues, Exchangers and Bindings Configurator from YML
 
-payloadBindings := []gorabbit.BindingConfig{
-    {
-        RoutingKey: "*.payload.#",
-        Exchange:   payloadExchangeConfig.Name,
-    },
-}
+You can write the full configuration in a YML file and then parse it to set up your
+RabbitMQ server with queues, exchanges and bindings.
 
-eventBindings := []gorabbit.BindingConfig{
-    {
-        RoutingKey: "*.event.#",
-        Exchange:   eventExchangeConfig.Name,
-    },
-}
+The following is an example YML configuration file:
 
-payloadQueueConfig := gorabbit.QueueConfig{
-    Name:      "payload_queue",
-    Durable:   true,
-    Exclusive: false,
-    Bindings:  &payloadBindings,
-}
+```yaml
+exchanges:
+  - name: "payloads_topic"
+    type: "topic"
+    persisted: true
+  - name: "events_topic"
+    type: "topic"
+    persisted: true
 
-eventQueueConfig := gorabbit.QueueConfig{
-    Name:      "event_queue",
-    Durable:   true,
-    Exclusive: false,
-    Bindings:  &eventBindings,
-}
+queues:
+  - name: "payload_queue"
+    durable: true
+    exclusive: false
+    bindings:
+      - routing_key: "*.payload.#"
+        exchange: "payloads_topic"
+  - name: "event_queue"
+    durable: true
+    exclusive: false
+    bindings:
+      - routing_key: "*.event.#"
+        exchange: "events_topic"
+```
 
-exchanges := []gorabbit.ExchangeConfig{payloadExchangeConfig, eventExchangeConfig}
-queues := []gorabbit.QueueConfig{payloadQueueConfig, eventQueueConfig}
+Then, you simply have to declare your file name/path before passing it to the YML configurator function
 
-err := gorabbit.SetupMQTT(clientConfig, exchanges, &queues)
+```go
+fileName := "./configurator.yml"
+err := gorabbit.SetupMQTTFromYML(clientConfig, fileName)
+```
 
-if err != nil {
-    panic(err.Error())
+
+#### Complete Example
+
+```go
+package main
+
+import (
+	"gitlab.kardinal.ai/aelkhou/gorabbit"
+)
+
+func main() {
+	clientConfig := gorabbit.ClientConfig{
+		Host:     "localhost",
+		Port:     5672,
+		Username: "guest",
+		Password: "guest",
+	}
+
+	fileName := "./configurator.yml"
+
+	err := gorabbit.SetupMQTTFromYML(clientConfig, fileName)
+
+	if err != nil {
+		panic(err.Error())
+	}
 }
 ```
 

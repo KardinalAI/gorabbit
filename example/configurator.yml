@@ -14,8 +14,8 @@ queues:
       - routing_key: "*.payload.#"
         exchange: "payloads_topic"
   - name: "event_queue"
-      durable: true
-      exclusive: false
-      bindings:
-        - routing_key: "*.event.#"
-          exchange: "events_topic"
+    durable: true
+    exclusive: false
+    bindings:
+      - routing_key: "*.event.#"
+        exchange: "events_topic"

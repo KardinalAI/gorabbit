@@ -14,13 +14,13 @@ func main() {
 
 	payloadExchangeConfig := gorabbit.ExchangeConfig{
 		Name:      "payloads_topic",
-		Type:      gorabbit.Topic,
+		Type:      "topic",
 		Persisted: true,
 	}
 
 	eventExchangeConfig := gorabbit.ExchangeConfig{
 		Name:      "events_topic",
-		Type:      gorabbit.Topic,
+		Type:      "topic",
 		Persisted: true,
 	}
 
@@ -55,7 +55,12 @@ func main() {
 	exchanges := []gorabbit.ExchangeConfig{payloadExchangeConfig, eventExchangeConfig}
 	queues := []gorabbit.QueueConfig{payloadQueueConfig, eventQueueConfig}
 
-	err := gorabbit.SetupMQTT(clientConfig, exchanges, &queues)
+	serverConfig := gorabbit.RabbitServerConfig{
+		Exchanges: exchanges,
+		Queues: queues,
+	}
+
+	err := gorabbit.SetupMQTT(clientConfig, serverConfig)
 
 	if err != nil {
 		panic(err.Error())
