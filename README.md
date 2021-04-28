@@ -68,7 +68,7 @@ You can declare a new exchange:
 ```go
 exchange := gorabbit.ExchangeConfig{
     Name:      "exchange_name",
-    Type:      gorabbit.Topic,
+    Type:      "topic",
     Persisted: true,
 }
 ```
@@ -109,13 +109,13 @@ clientConfig := gorabbit.ClientConfig{
 }
 payloadExchangeConfig := gorabbit.ExchangeConfig{
     Name:      "payloads_topic",
-    Type:      gorabbit.Topic,
+    Type:      "topic",
     Persisted: true,
 }
 
 eventExchangeConfig := gorabbit.ExchangeConfig{
     Name:      "events_topic",
-    Type:      gorabbit.Topic,
+    Type:      "topic",
     Persisted: true,
 }
 
