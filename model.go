@@ -1,5 +1,7 @@
 package gorabbit
 
+// Topic Type of exchanges
+// (Only topic supported for now)
 const (
 	Topic = "topic"
 )
