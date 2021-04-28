@@ -9,7 +9,20 @@ This module depends on the official [Go RabbitMQ library](https://github.com/str
 To add this module to your project, simple run the following command:
 
 ```bash
-    go get gitlab.kardinal.ai/aelkhou/gorabbit
+go get gitlab.kardinal.ai/aelkhou/gorabbit
+```
+
+If you get an error regarding the host not found, run the following command:
+
+```bash
+git config --global --add url.git@git config --global --add url.git@gitlab.kardinal.ai:.insteadOf https://gitlab.kardinal.ai/gitlab.kardinal.ai:.insteadOf https://gitlab.kardinal.ai/
+```
+
+Then if you are having trouble updating the package to the latest version, run the following commands:
+
+```bash
+go env -w GONOPROXY="gitlab.kardinal.ai/*"
+go env -w GONOSUMDB="gitlab.kardinal.ai/*"
 ```
 
 ## Usage
