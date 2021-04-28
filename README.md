@@ -9,7 +9,7 @@ This module depends on the official [Go RabbitMQ library](https://github.com/str
 To add this module to your project, simple run the following command:
 
 ```bash
-    go get gitlab.kardianl.ai/aelkhou/gorabbit
+    go get gitlab.kardinal.ai/aelkhou/gorabbit
 ```
 
 ## Usage

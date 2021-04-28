@@ -1,4 +1,4 @@
-package go_mqtt
+package util
 
 const (
 	Topic = "topic"
