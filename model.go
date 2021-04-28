@@ -1,4 +1,4 @@
-package util
+package gorabbit
 
 const (
 	Topic = "topic"

@@ -1,4 +1,4 @@
-package util
+package gorabbit
 
 import (
 	"fmt"

@@ -1,4 +1,4 @@
-package util
+package gorabbit
 
 func SetupMQTT(clientConfig ClientConfig, exchangeConfigs []ExchangeConfig, queueConfigs *[]QueueConfig) error {
 	err := initConnection(clientConfig)
