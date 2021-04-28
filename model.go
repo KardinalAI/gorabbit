@@ -14,19 +14,24 @@ type ClientConfig struct {
 }
 
 type ExchangeConfig struct {
-	Name      string
-	Type      string
-	Persisted bool
+	Name      string `yaml:"name"`
+	Type      string `yaml:"type"`
+	Persisted bool   `yaml:"persisted"`
 }
 
 type QueueConfig struct {
-	Name      string
-	Durable   bool
-	Exclusive bool
-	Bindings  *[]BindingConfig
+	Name      string           `yaml:"name"`
+	Durable   bool             `yaml:"durable"`
+	Exclusive bool             `yaml:"exclusive"`
+	Bindings  *[]BindingConfig `yaml:"bindings"`
 }
 
 type BindingConfig struct {
-	RoutingKey string
-	Exchange   string
+	RoutingKey string `yaml:"routing_key"`
+	Exchange   string `yaml:"exchange"`
+}
+
+type RabbitServerConfig struct {
+	Exchanges []ExchangeConfig `yaml:"exchanges"`
+	Queues    []QueueConfig    `yaml:"queues"`
 }
