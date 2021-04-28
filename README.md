@@ -183,7 +183,7 @@ router.Run()
 ```
 if you intend to keep an open connection while the app is running.
 
-Once your client is initialized, to send an event simple call the integrated function as following:
+Once your client is initialized, to send an event simply call the integrated function as following:
 ```go
 client.SendEvent("exchange", "routingKey", payload)
 ```
