@@ -1,4 +1,4 @@
 github.com/streadway/amqp v1.0.0 h1:kuuDrUJFZL1QYL9hUNuCxNObNzB0bV/ZG5jV3RWAQgo=
 github.com/streadway/amqp v1.0.0/go.mod h1:AZpEONHx3DKn8O/DFsRAY58/XVQiIPMTMB1SddzLXVw=
-gitlab.kardinal.ai/aelkhou/gorabbit v0.0.3 h1:4QVBxhOUD4ZZCrsoY2bSJRnHOkbyd9hpITiyMVGKV9s=
-gitlab.kardinal.ai/aelkhou/gorabbit v0.0.3/go.mod h1:iScW7iSUG7IxUa+iOUWN7dJcDwoNnAQt4apNkbBNYzo=
+gitlab.kardinal.ai/aelkhou/gorabbit v0.0.4 h1:2nOAPkNEQ8nYEzgj6OD97DQA+kAoGadLmwFDgwDnbZo=
+gitlab.kardinal.ai/aelkhou/gorabbit v0.0.4/go.mod h1:iScW7iSUG7IxUa+iOUWN7dJcDwoNnAQt4apNkbBNYzo=
