@@ -32,9 +32,11 @@ func main() {
 		}
 	}()
 
+	log.Printf(" [*] Waiting for messages. To exit press CTRL+C")
+
 	<-forever
 }
 
 func handleEvent(event []byte) {
-	log.Printf("Received message: %d bytes", len(event))
+	log.Printf("Received message: %s", event)
 }
