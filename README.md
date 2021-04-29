@@ -91,7 +91,12 @@ clientConfig := gorabbit.ClientConfig{
 
 ...
 
-err := gorabbit.SetupMQTT(clientConfig, exchanges, &queues)
+serverConfig := gorabbit.RabbitServerConfig{
+    Exchanges: exchanges,
+    Queues: queues,
+}
+
+err := gorabbit.SetupMQTT(clientConfig, serverConfig)
 
 if err != nil {
     panic(err.Error())
