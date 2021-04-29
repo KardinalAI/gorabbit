@@ -313,3 +313,14 @@ go func() {
 ```
 
 whereas in Gin, the program itself is continuous, so creating a continuous loop is unnecessary, so you can get rid of the "forever" channel.
+
+
+## Launch Local RabbitMQ Server
+
+To run a local rabbitMQ server quickly with a docker container, simply run the following command:
+```bash
+docker run -it --rm --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
+```
+
+It will launch a local RabbitMQ server mapped on port 5672, and the management dashboard will be mapped on
+port 15672 accessible on localhost:15672 with a username "guest" and password "guest"
