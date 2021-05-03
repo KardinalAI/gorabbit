@@ -22,13 +22,18 @@ func main() {
 	defer gorabbit.Connection.Close()
 	defer gorabbit.Channel.Close()
 
-	messages, err := client.SubscribeToEvents("payload_queue", nil)
+	messages, err := client.SubscribeToEvents("payload_queue", nil, false)
 
 	forever := make(chan bool)
 
 	go func() {
 		for d := range messages {
 			handleEvent(d.Body)
+			err = d.Ack(false)
+
+			if err != nil {
+				log.Fatal("could not acknowledge delivery")
+			}
 		}
 	}()
 

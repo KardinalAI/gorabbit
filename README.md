@@ -294,7 +294,7 @@ The client initialization is the same as the Event Sender.
 
 Once the client is initialized, you can subscribe to an event by using the integrated function as following:
 ```go
-messages, err := client.SubscribeToEvents("queue_name", "consumer_name")
+messages, err := client.SubscribeToEvents("queue_name", "consumer_name", false)
 ```
 
 where messages is an asynchronous incoming stream of events that needs to be properly consumed preferably in a go routine.
@@ -313,6 +313,59 @@ go func() {
 ```
 
 whereas in Gin, the program itself is continuous, so creating a continuous loop is unnecessary, so you can get rid of the "forever" channel.
+
+The last parameter of this function is a boolean specifying whether you want events to be auto acknowledged or not.
+
+If you wish not to auto aknowledge events, then you **must** acknowledge, reject or not acknowledge them manually:
+
+ACK:
+```go
+// if multiple is true, all previously unacknowledged events will also be acknowledged.
+message.Ack(multiple bool)
+```
+```go
+for d := range messages {
+	log.Printf("Received message: %s", d.Body)
+    err = d.Ack(false)
+
+    if err != nil {
+        log.Fatal("could not acknowledge delivery")
+    }
+}
+```
+
+NACK:
+```go
+// if multiple is true, all previously unacknowledged events will also be acknowledged.
+// if requeue is true, the "nacked" event will be resent to the queue.
+message.Nack(multiple bool, requeue bool)
+```
+```go
+for d := range messages {
+	log.Printf("Received message: %s", d.Body)
+    err = d.Nack(false, true)
+
+    if err != nil {
+        log.Fatal("could not nack delivery")
+    }
+}
+```
+
+REJECT:
+```go
+// if requeue is true, the rejected event will be resent to the queue.
+message.Reject(requeue bool)
+```
+```go
+for d := range messages {
+	log.Printf("Received message: %s", d.Body)
+    err = d.Reject(true)
+
+    if err != nil {
+        log.Fatal("could not reject delivery")
+    }
+}
+```
 
 
 ## Launch Local RabbitMQ Server
