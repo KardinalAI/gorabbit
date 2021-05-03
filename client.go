@@ -17,7 +17,7 @@ var (
 type MQTTClient interface {
 	connect() error
 	SendEvent(exchange string, routingKey string, payload []byte) error
-	SubscribeToEvents(queue string, consumer *string) (<-chan amqp.Delivery, error)
+	SubscribeToEvents(queue string, consumer *string, autoAck bool) (<-chan amqp.Delivery, error)
 }
 
 type mqttClient struct {
@@ -70,7 +70,7 @@ func (client *mqttClient) SendEvent(exchange string, routingKey string, payload 
 // queue is the name of the queue to connect to
 // consumer[optional] is the unique identifier of the consumer. Leaving it empty will generate a unique identifier
 // returns an incoming channel of amqp.Delivery (messages)
-func (client *mqttClient) SubscribeToEvents(queue string, consumer *string) (<-chan amqp.Delivery, error) {
+func (client *mqttClient) SubscribeToEvents(queue string, consumer *string, autoAck bool) (<-chan amqp.Delivery, error) {
 	// Before sending a message, we need to make sure that Connection and Channel are valid
 	if Connection == nil || Channel == nil {
 
@@ -94,7 +94,7 @@ func (client *mqttClient) SubscribeToEvents(queue string, consumer *string) (<-c
 	messages, err := Channel.Consume(
 		queue,     // queue
 		*consumer, // consumer
-		true,      // auto ack
+		autoAck,   // auto ack
 		false,     // exclusive
 		false,     // no local
 		false,     // no wait
