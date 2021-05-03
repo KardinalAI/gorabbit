@@ -14,8 +14,8 @@ func SetupMQTT(clientConfig ClientConfig, serverConfig RabbitServerConfig) error
 	}
 
 	// Defer connection and channel closing until the setup is executed
-	defer Connection.Close()
-	defer Channel.Close()
+	defer connection.Close()
+	defer channel.Close()
 
 	// Loop through all declared exchanges to create them
 	for _, exchange := range serverConfig.Exchanges {
@@ -65,8 +65,8 @@ func SetupMQTTFromYML(clientConfig ClientConfig, filePath string) error {
 	}
 
 	// Defer connection and channel closing until the setup is executed
-	defer Connection.Close()
-	defer Channel.Close()
+	defer connection.Close()
+	defer channel.Close()
 
 	// Loop through all declared exchanges to create them
 	for _, exchange := range config.Exchanges {
@@ -136,7 +136,7 @@ func initConnection(config ClientConfig) error {
 
 // declareExchange will initialize you exchange in the RabbitMQ server
 func declareExchange(config ExchangeConfig) error {
-	err := Channel.ExchangeDeclare(
+	err := channel.ExchangeDeclare(
 		config.Name,       // name
 		config.Type,       // type
 		config.Persisted,  // durable
@@ -151,7 +151,7 @@ func declareExchange(config ExchangeConfig) error {
 
 // declareQueue will initialize you queue in the RabbitMQ server
 func declareQueue(config QueueConfig) error {
-	_, err := Channel.QueueDeclare(
+	_, err := channel.QueueDeclare(
 		config.Name,      // name
 		config.Durable,   // durable
 		false,            // delete when unused
@@ -169,7 +169,7 @@ func declareQueue(config QueueConfig) error {
 
 // addQueueBinding will bind a queue to an exchange via a specific routing key
 func addQueueBinding(queue string, routingKey string, exchange string) error {
-	err := Channel.QueueBind(
+	err := channel.QueueBind(
 		queue,
 		routingKey,
 		exchange,

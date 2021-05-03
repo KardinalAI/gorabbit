@@ -8,14 +8,15 @@ import (
 var (
 	// Connection manages the serialization and deserialization of incoming
 	// and outgoing frames and then dispatches them to the correct Channel
-	Connection *amqp.Connection
+	connection *amqp.Connection
 
 	// Channel represents the AMQP channel
-	Channel *amqp.Channel
+	channel *amqp.Channel
 )
 
 type MQTTClient interface {
 	connect() error
+	Disconnect() error
 	SendEvent(exchange string, routingKey string, payload []byte) error
 	SubscribeToEvents(queue string, consumer *string, autoAck bool) (<-chan amqp.Delivery, error)
 }
@@ -40,7 +41,7 @@ type mqttClient struct {
 // payload is the object you want to send as a byte array
 func (client *mqttClient) SendEvent(exchange string, routingKey string, payload []byte) error {
 	// Before sending a message, we need to make sure that Connection and Channel are valid
-	if Connection == nil || Channel == nil {
+	if connection == nil || channel == nil {
 
 		// Otherwise we need to connect again
 		err := client.connect()
@@ -52,7 +53,7 @@ func (client *mqttClient) SendEvent(exchange string, routingKey string, payload 
 
 	// Publish the message via the official amqp package
 	// with our given configuration
-	err := Channel.Publish(
+	err := channel.Publish(
 		exchange,   // exchange
 		routingKey, // routing key
 		false,      // mandatory
@@ -72,7 +73,7 @@ func (client *mqttClient) SendEvent(exchange string, routingKey string, payload 
 // returns an incoming channel of amqp.Delivery (messages)
 func (client *mqttClient) SubscribeToEvents(queue string, consumer *string, autoAck bool) (<-chan amqp.Delivery, error) {
 	// Before sending a message, we need to make sure that Connection and Channel are valid
-	if Connection == nil || Channel == nil {
+	if connection == nil || channel == nil {
 
 		// Otherwise we need to connect again
 		err := client.connect()
@@ -91,7 +92,7 @@ func (client *mqttClient) SubscribeToEvents(queue string, consumer *string, auto
 
 	// Consume events via the official amqp package
 	// with our given configuration
-	messages, err := Channel.Consume(
+	messages, err := channel.Consume(
 		queue,     // queue
 		*consumer, // consumer
 		autoAck,   // auto ack
@@ -119,7 +120,7 @@ func (client *mqttClient) connect() error {
 		return err
 	}
 
-	Connection = conn
+	connection = conn
 
 	ch, err := conn.Channel()
 
@@ -127,9 +128,21 @@ func (client *mqttClient) connect() error {
 		return err
 	}
 
-	Channel = ch
+	channel = ch
 
 	return nil
+}
+
+func (client *mqttClient) Disconnect() error {
+	err := connection.Close()
+
+	if err != nil {
+		return err
+	}
+
+	err = channel.Close()
+
+	return err
 }
 
 func NewMQTTClient(config ClientConfig) (MQTTClient, error) {
