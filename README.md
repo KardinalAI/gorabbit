@@ -267,16 +267,15 @@ if err != nil {
 client = c
 ```
 
-Once the client initialized, the Connection and Channel objects will be initialized but do not close at any point yet.
-It is very important to properly manage the closure of both streams otherwise you might not send anything. At the
-correct point in the microservice, consider adding the following two lines of code:
+Once the client initialized, the connection and channel will be initialized but do not close at any point yet.
+It is very important to properly manage the closure of both streams otherwise you might not send or receive anything. At the
+correct point in the microservice, consider Disconnecting the client with its integrated function:
 
 ```go
-defer gorabbit.Connection.Close()
-defer gorabbit.Channel.Close()
+defer client.Disconnect()
 ```
 
-For example in Gin, those should be declared in your main function before:
+For example in Gin, this should be declared in your main function before:
 ```go 
 router.Run()
 ```

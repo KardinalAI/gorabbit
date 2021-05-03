@@ -5,6 +5,8 @@ import (
 	"log"
 )
 
+var client gorabbit.MQTTClient
+
 func main() {
 	clientConfig := gorabbit.ClientConfig{
 		Host:     "localhost",
@@ -13,14 +15,15 @@ func main() {
 		Password: "guest",
 	}
 
-	client, err := gorabbit.NewMQTTClient(clientConfig)
+	c, err := gorabbit.NewMQTTClient(clientConfig)
 
 	if err != nil {
 		panic(err.Error())
 	}
 
-	defer gorabbit.Connection.Close()
-	defer gorabbit.Channel.Close()
+	client = c
+
+	defer client.Disconnect()
 
 	messages, err := client.SubscribeToEvents("payload_queue", nil, false)
 

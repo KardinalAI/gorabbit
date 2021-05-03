@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"gitlab.kardinal.ai/aelkhou/gorabbit"
 )
 
@@ -22,12 +23,13 @@ func main() {
 
 	client = c
 
-	defer gorabbit.Connection.Close()
-	defer gorabbit.Channel.Close()
+	defer client.Disconnect()
 
-	err = client.SendEvent("payloads_topic","event.payload.heavy", []byte("Hello World! This is a dummy heavy payload :)"))
+	for i := 0; i < 100000; i++ {
+		err = client.SendEvent("payloads_topic", "event.payload.heavy", []byte(fmt.Sprintf("I am sending message number: %d", i+1)))
 
-	if err != nil {
-		panic(err.Error())
+		if err != nil {
+			panic(err.Error())
+		}
 	}
 }
