@@ -70,6 +70,7 @@ func (client *mqttClient) SendEvent(exchange string, routingKey string, payload 
 // SubscribeToEvents will connect to a queue and consume all incoming events from it
 // queue is the name of the queue to connect to
 // consumer[optional] is the unique identifier of the consumer. Leaving it empty will generate a unique identifier
+// if autoAck is set to true, received events will be auto acknowledged as soon as they are consumed (received)
 // returns an incoming channel of amqp.Delivery (messages)
 func (client *mqttClient) SubscribeToEvents(queue string, consumer *string, autoAck bool) (<-chan amqp.Delivery, error) {
 	// Before sending a message, we need to make sure that Connection and Channel are valid
