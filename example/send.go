@@ -26,7 +26,7 @@ func main() {
 	defer client.Disconnect()
 
 	for i := 0; i < 100000; i++ {
-		err = client.SendEvent("payloads_topic", "event.payload.heavy", []byte(fmt.Sprintf("I am sending message number: %d", i+1)))
+		err = client.SendEvent("payloads_topic", "event.payload.heavy", gorabbit.PriorityHigh, []byte(fmt.Sprintf("I am sending message number: %d", i+1)))
 
 		if err != nil {
 			panic(err.Error())
