@@ -1,8 +1,10 @@
 package gorabbit
 
 import (
+	"errors"
 	"fmt"
 	"github.com/streadway/amqp"
+	"strings"
 )
 
 var (
@@ -17,8 +19,9 @@ var (
 type MQTTClient interface {
 	connect() error
 	Disconnect() error
-	SendEvent(exchange string, routingKey string, payload []byte) error
+	SendEvent(exchange string, routingKey string, priority uint8, payload []byte) error
 	SubscribeToEvents(queue string, consumer *string, autoAck bool) (<-chan amqp.Delivery, error)
+	ParseMessage(delivery amqp.Delivery) (error, *MessageType)
 }
 
 type mqttClient struct {
@@ -38,8 +41,9 @@ type mqttClient struct {
 // SendEvent will send the desired payload through the selected channel
 // exchange is the name of the exchange targeted for event publishing
 // routingKey is the route that the exchange will use to forward the message
+// priority is the priority level of the message (1 to 7)
 // payload is the object you want to send as a byte array
-func (client *mqttClient) SendEvent(exchange string, routingKey string, payload []byte) error {
+func (client *mqttClient) SendEvent(exchange string, routingKey string, priority uint8, payload []byte) error {
 	// Before sending a message, we need to make sure that Connection and Channel are valid
 	if connection == nil || channel == nil {
 
@@ -61,6 +65,8 @@ func (client *mqttClient) SendEvent(exchange string, routingKey string, payload 
 		amqp.Publishing{
 			ContentType: "text/plain",
 			Body:        payload,
+			Type:        routingKey,
+			Priority:    priority,
 		},
 	)
 
@@ -144,6 +150,28 @@ func (client *mqttClient) Disconnect() error {
 	err = channel.Close()
 
 	return err
+}
+
+
+func (client *mqttClient) ParseMessage(delivery amqp.Delivery) (error, *MessageType) {
+	messageArgs := delivery.Type
+
+	if messageArgs == "" {
+		return errors.New("could not parse empty string"), nil
+	}
+
+	splitArgs := strings.Split(messageArgs, ".")
+
+	if len(splitArgs) < 4 {
+		return errors.New("invalid format"), nil
+	}
+
+	return nil, &MessageType{
+		Type:         splitArgs[0],
+		Microservice: splitArgs[1],
+		Entity:       splitArgs[2],
+		Action:       splitArgs[3],
+	}
 }
 
 func NewMQTTClient(config ClientConfig) (MQTTClient, error) {

@@ -29,3 +29,10 @@ type RabbitServerConfig struct {
 	Exchanges []ExchangeConfig `yaml:"exchanges"`
 	Queues    []QueueConfig    `yaml:"queues"`
 }
+
+type MessageType struct {
+	Type         string
+	Microservice string
+	Entity       string
+	Action       string
+}

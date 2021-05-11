@@ -69,13 +69,13 @@ You can declare a new exchange:
 ```go
 exchange := gorabbit.ExchangeConfig{
     Name:      "exchange_name",
-    Type:      "topic",
+    Type:      gorabbit.TypeTopic,
     Persisted: true,
 }
 ```
 
 * Name: The unique identifier for the exchange
-* Type: The exchange type (For now we only support "topic")
+* Type: The exchange type (Topic, Direct, Fanout, Headers). Ref: https://lostechies.com/derekgreer/2012/03/28/rabbitmq-for-windows-exchange-types/
 * Persisted: Determines whether the exchange is persisted on server stop/kill/restart
 
 Finally, to run the setup after declaring all the configs, you need to connect to the RabbitMQ server and execute the
@@ -283,7 +283,7 @@ if you intend to keep an open connection while the app is running.
 
 Once your client is initialized, to send an event simply call the integrated function as following:
 ```go
-client.SendEvent("exchange", "routingKey", payload)
+client.SendEvent("exchange", "routingKey", gorabbit.PriorityLow, payload)
 ```
 where the payload should be a []byte
 
