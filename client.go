@@ -1,10 +1,8 @@
 package gorabbit
 
 import (
-	"errors"
 	"fmt"
 	"github.com/streadway/amqp"
-	"strings"
 )
 
 var (
@@ -21,7 +19,6 @@ type MQTTClient interface {
 	Disconnect() error
 	SendEvent(exchange string, routingKey string, priority uint8, payload []byte) error
 	SubscribeToEvents(queue string, consumer *string, autoAck bool) (<-chan amqp.Delivery, error)
-	ParseMessage(delivery amqp.Delivery) (error, *MessageType)
 }
 
 type mqttClient struct {
@@ -150,28 +147,6 @@ func (client *mqttClient) Disconnect() error {
 	err = channel.Close()
 
 	return err
-}
-
-
-func (client *mqttClient) ParseMessage(delivery amqp.Delivery) (error, *MessageType) {
-	messageArgs := delivery.Type
-
-	if messageArgs == "" {
-		return errors.New("could not parse empty string"), nil
-	}
-
-	splitArgs := strings.Split(messageArgs, ".")
-
-	if len(splitArgs) < 4 {
-		return errors.New("invalid format"), nil
-	}
-
-	return nil, &MessageType{
-		Type:         splitArgs[0],
-		Microservice: splitArgs[1],
-		Entity:       splitArgs[2],
-		Action:       splitArgs[3],
-	}
 }
 
 func NewMQTTClient(config ClientConfig) (MQTTClient, error) {
