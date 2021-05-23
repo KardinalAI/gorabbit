@@ -24,6 +24,18 @@ const (
 )
 
 const (
+	ConsumerSolange  = "solange_consumer"
+	ConsumerPlan     = "plan_consumer"
+	ConsumerActivity = "activity_consumer"
+)
+
+const (
+	MicroserviceSolange  = "solange"
+	MicroservicePlan     = "plan"
+	MicroserviceActivity = "activity"
+)
+
+const (
 	PriorityLowest  = 1
 	PriorityVeryLow = 2
 	PriorityLow     = 3
