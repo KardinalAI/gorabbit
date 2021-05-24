@@ -3,7 +3,7 @@ package utils
 import (
 	"errors"
 	"github.com/streadway/amqp"
-	"gitlab.kardinal.ai/aelkhou/gorabbit"
+	"gitlab.kardinal.ai/coretech/gorabbit"
 	"strings"
 )
 
