@@ -1,7 +1,7 @@
 package main
 
 import (
-	"gitlab.kardinal.ai/aelkhou/gorabbit"
+	"gitlab.kardinal.ai/coretech/gorabbit"
 )
 
 func main() {
@@ -57,7 +57,7 @@ func main() {
 
 	serverConfig := gorabbit.RabbitServerConfig{
 		Exchanges: exchanges,
-		Queues: queues,
+		Queues:    queues,
 	}
 
 	err := gorabbit.SetupMQTT(clientConfig, serverConfig)

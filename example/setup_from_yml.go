@@ -1,7 +1,7 @@
 package main
 
 import (
-	"gitlab.kardinal.ai/aelkhou/gorabbit"
+	"gitlab.kardinal.ai/coretech/gorabbit"
 )
 
 func main() {
@@ -20,4 +20,3 @@ func main() {
 		panic(err.Error())
 	}
 }
-

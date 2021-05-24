@@ -1,7 +1,7 @@
 package main
 
 import (
-	"gitlab.kardinal.ai/aelkhou/gorabbit"
+	"gitlab.kardinal.ai/coretech/gorabbit"
 	"log"
 )
 

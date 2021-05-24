@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"gitlab.kardinal.ai/aelkhou/gorabbit"
+	"gitlab.kardinal.ai/coretech/gorabbit"
 )
 
 var client gorabbit.MQTTClient
