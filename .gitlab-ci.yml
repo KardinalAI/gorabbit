@@ -5,4 +5,4 @@ test:
     - if [ -n "$(gofmt -l .)" ]; then gofmt -d .; exit 1; fi
     - go vet ./...
     - go test -race $(go list ./... | grep -v /vendor/) -v -coverprofile=coverage.out
-    - go tool cover -func=coverage.ou
+    - go tool cover -func=coverage.out
