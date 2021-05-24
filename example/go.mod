@@ -1,5 +1,5 @@
-module gitlab.kardinal.ai/aelkhou/gorabbit/example
+module gitlab.kardinal.ai/coretech/gorabbit/example
 
 go 1.16
 
-require gitlab.kardinal.ai/aelkhou/gorabbit v0.1.5
+require gitlab.kardinal.ai/coretech/gorabbit latest

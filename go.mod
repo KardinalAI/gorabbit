@@ -1,4 +1,4 @@
-module gitlab.kardinal.ai/aelkhou/gorabbit
+module gitlab.kardinal.ai/coretech/gorabbit
 
 go 1.16
 

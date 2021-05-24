@@ -9,7 +9,7 @@ This module depends on the official [Go RabbitMQ library](https://github.com/str
 To add this module to your project, simple run the following command:
 
 ```bash
-go get gitlab.kardinal.ai/aelkhou/gorabbit
+go get gitlab.kardinal.ai/coretech/gorabbit
 ```
 
 If you get an error regarding the host not found, run the following command:
@@ -110,7 +110,7 @@ if err != nil {
 package main
 
 import (
-	"gitlab.kardinal.ai/aelkhou/gorabbit"
+	"gitlab.kardinal.ai/coretech/gorabbit"
 )
 
 func main() {
@@ -222,7 +222,7 @@ err := gorabbit.SetupMQTTFromYML(clientConfig, fileName)
 package main
 
 import (
-	"gitlab.kardinal.ai/aelkhou/gorabbit"
+	"gitlab.kardinal.ai/coretech/gorabbit"
 )
 
 func main() {
