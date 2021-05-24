@@ -1,8 +1,6 @@
 github.com/go-playground/assert/v2 v2.0.1/go.mod h1:VDjEfimB/XKnb+ZQfWdccd7VUvScMdVu0Titje2rxJ4=
 github.com/streadway/amqp v1.0.0 h1:kuuDrUJFZL1QYL9hUNuCxNObNzB0bV/ZG5jV3RWAQgo=
 github.com/streadway/amqp v1.0.0/go.mod h1:AZpEONHx3DKn8O/DFsRAY58/XVQiIPMTMB1SddzLXVw=
-gitlab.kardinal.ai/aelkhou/gorabbit v0.1.5 h1:iMss54voGwtMB7o9C8L7ADHb4DAdU2vgqpmhrVTJ1pY=
-gitlab.kardinal.ai/aelkhou/gorabbit v0.1.5/go.mod h1:iB42LcNND67QFqqWIdG5f4f2VkkZQVdgz6mFnygyT8Q=
 gitlab.kardinal.ai/coretech/gorabbit v0.0.0-20210524093621-945510a2aeeb h1:mRCVkygLLTgNNAIY/28Q/PeFd2yiP+zxLf0OwzhycZo=
 gitlab.kardinal.ai/coretech/gorabbit v0.0.0-20210524093621-945510a2aeeb/go.mod h1:yuyaV5E+c4abrgZENCSMpS6NlcEhF9L9ViWAKVduJZ0=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=
