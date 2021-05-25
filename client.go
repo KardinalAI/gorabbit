@@ -18,7 +18,7 @@ type MQTTClient interface {
 	connect() error
 	Disconnect() error
 	SendEvent(exchange string, routingKey string, priority uint8, payload []byte) error
-	SubscribeToEvents(queue string, consumer *string, autoAck bool) (<-chan amqp.Delivery, error)
+	SubscribeToEvents(queue string, consumer string, autoAck bool) (<-chan amqp.Delivery, error)
 }
 
 type mqttClient struct {
@@ -75,7 +75,7 @@ func (client *mqttClient) SendEvent(exchange string, routingKey string, priority
 // consumer[optional] is the unique identifier of the consumer. Leaving it empty will generate a unique identifier
 // if autoAck is set to true, received events will be auto acknowledged as soon as they are consumed (received)
 // returns an incoming channel of amqp.Delivery (messages)
-func (client *mqttClient) SubscribeToEvents(queue string, consumer *string, autoAck bool) (<-chan amqp.Delivery, error) {
+func (client *mqttClient) SubscribeToEvents(queue string, consumer string, autoAck bool) (<-chan amqp.Delivery, error) {
 	// Before sending a message, we need to make sure that Connection and Channel are valid
 	if connection == nil || channel == nil {
 
@@ -87,23 +87,16 @@ func (client *mqttClient) SubscribeToEvents(queue string, consumer *string, auto
 		}
 	}
 
-	// If the consumer is nil, replace it with an empty string
-	randomConsumer := ""
-
-	if consumer == nil {
-		consumer = &randomConsumer
-	}
-
 	// Consume events via the official amqp package
 	// with our given configuration
 	messages, err := channel.Consume(
-		queue,     // queue
-		*consumer, // consumer
-		autoAck,   // auto ack
-		false,     // exclusive
-		false,     // no local
-		false,     // no wait
-		nil,       // args
+		queue,    // queue
+		consumer, // consumer
+		autoAck,  // auto ack
+		false,    // exclusive
+		false,    // no local
+		false,    // no wait
+		nil,      // args
 	)
 
 	if err != nil {
