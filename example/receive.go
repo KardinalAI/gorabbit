@@ -25,7 +25,7 @@ func main() {
 
 	defer client.Disconnect()
 
-	messages, err := client.SubscribeToEvents("payload_queue", nil, false)
+	messages, err := client.SubscribeToEvents("payload_queue", "", false)
 
 	forever := make(chan bool)
 
