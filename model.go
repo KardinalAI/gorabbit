@@ -1,5 +1,7 @@
 package gorabbit
 
+import "github.com/streadway/amqp"
+
 type ClientConfig struct {
 	Host     string
 	Port     uint
@@ -30,7 +32,8 @@ type RabbitServerConfig struct {
 	Queues    []QueueConfig    `yaml:"queues"`
 }
 
-type MessageType struct {
+type AMQPMessage struct {
+	AMQPDelivery amqp.Delivery
 	Type         string
 	Microservice string
 	Entity       string

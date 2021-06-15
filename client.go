@@ -3,6 +3,7 @@ package gorabbit
 import (
 	"fmt"
 	"github.com/streadway/amqp"
+	"gitlab.kardinal.ai/coretech/gorabbit/utils"
 )
 
 var (
@@ -18,7 +19,7 @@ type MQTTClient interface {
 	connect() error
 	Disconnect() error
 	SendEvent(exchange string, routingKey string, priority uint8, payload []byte) error
-	SubscribeToEvents(queue string, consumer string, autoAck bool) (<-chan amqp.Delivery, error)
+	SubscribeToEvents(queue string, consumer string, autoAck bool) (<-chan AMQPMessage, error)
 }
 
 type mqttClient struct {
@@ -75,7 +76,7 @@ func (client *mqttClient) SendEvent(exchange string, routingKey string, priority
 // consumer[optional] is the unique identifier of the consumer. Leaving it empty will generate a unique identifier
 // if autoAck is set to true, received events will be auto acknowledged as soon as they are consumed (received)
 // returns an incoming channel of amqp.Delivery (messages)
-func (client *mqttClient) SubscribeToEvents(queue string, consumer string, autoAck bool) (<-chan amqp.Delivery, error) {
+func (client *mqttClient) SubscribeToEvents(queue string, consumer string, autoAck bool) (<-chan AMQPMessage, error) {
 	// Before sending a message, we need to make sure that Connection and Channel are valid
 	if connection == nil || channel == nil {
 
@@ -103,7 +104,19 @@ func (client *mqttClient) SubscribeToEvents(queue string, consumer string, autoA
 		return nil, err
 	}
 
-	return messages, nil
+	parsedDeliveries := make(chan AMQPMessage)
+
+	go func() {
+		for message := range messages {
+			parsed, parseErr := utils.ParseMessage(message)
+
+			if parseErr == nil {
+				parsedDeliveries <- *parsed
+			}
+		}
+	}()
+
+	return parsedDeliveries, nil
 }
 
 // connect will initialize the AMQP connection, Connection and Channel

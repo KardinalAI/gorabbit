@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func ParseMessage(delivery amqp.Delivery) (*gorabbit.MessageType, error) {
+func ParseMessage(delivery amqp.Delivery) (*gorabbit.AMQPMessage, error) {
 	messageArgs := delivery.Type
 
 	if messageArgs == "" {
@@ -26,7 +26,8 @@ func ParseMessage(delivery amqp.Delivery) (*gorabbit.MessageType, error) {
 		}
 	}
 
-	return &gorabbit.MessageType{
+	return &gorabbit.AMQPMessage{
+		AMQPDelivery: delivery,
 		Type:         splitArgs[0],
 		Microservice: splitArgs[1],
 		Entity:       splitArgs[2],
