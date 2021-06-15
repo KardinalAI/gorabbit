@@ -15,7 +15,7 @@ go get gitlab.kardinal.ai/coretech/gorabbit
 If you get an error regarding the host not found, run the following command:
 
 ```bash
-git config --global --add url.git@git config --global --add url.git@gitlab.kardinal.ai:.insteadOf https://gitlab.kardinal.ai/gitlab.kardinal.ai:.insteadOf https://gitlab.kardinal.ai/
+git config --global --add url.git@gitlab.kardinal.ai:.insteadOf https://gitlab.kardinal.ai/
 ```
 
 Then if you are having trouble updating the package to the latest version, run the following commands:
