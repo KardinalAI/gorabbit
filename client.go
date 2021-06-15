@@ -3,7 +3,7 @@ package gorabbit
 import (
 	"fmt"
 	"github.com/streadway/amqp"
-	"gitlab.kardinal.ai/coretech/gorabbit/utils"
+	"time"
 )
 
 var (
@@ -108,7 +108,7 @@ func (client *mqttClient) SubscribeToEvents(queue string, consumer string, autoA
 
 	go func() {
 		for message := range messages {
-			parsed, parseErr := utils.ParseMessage(message)
+			parsed, parseErr := ParseMessage(message)
 
 			if parseErr == nil {
 				parsedDeliveries <- *parsed
@@ -166,6 +166,14 @@ func NewMQTTClient(config ClientConfig) (MQTTClient, error) {
 	err := client.connect()
 
 	if err != nil {
+		// if maxRetry is set and greater than 0
+		// we recursively call the constructor to
+		// retry connecting
+		if config.MaxRetry > 0 {
+			config.MaxRetry -= 1
+			time.Sleep(config.RetryDelay)
+			return NewMQTTClient(config)
+		}
 		return nil, err
 	}
 

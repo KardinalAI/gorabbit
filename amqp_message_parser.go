@@ -1,13 +1,12 @@
-package utils
+package gorabbit
 
 import (
 	"errors"
 	"github.com/streadway/amqp"
-	"gitlab.kardinal.ai/coretech/gorabbit"
 	"strings"
 )
 
-func ParseMessage(delivery amqp.Delivery) (*gorabbit.AMQPMessage, error) {
+func ParseMessage(delivery amqp.Delivery) (*AMQPMessage, error) {
 	messageArgs := delivery.Type
 
 	if messageArgs == "" {
@@ -26,8 +25,8 @@ func ParseMessage(delivery amqp.Delivery) (*gorabbit.AMQPMessage, error) {
 		}
 	}
 
-	return &gorabbit.AMQPMessage{
-		AMQPDelivery: delivery,
+	return &AMQPMessage{
+		Delivery:     delivery,
 		Type:         splitArgs[0],
 		Microservice: splitArgs[1],
 		Entity:       splitArgs[2],

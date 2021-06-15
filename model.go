@@ -1,12 +1,17 @@
 package gorabbit
 
-import "github.com/streadway/amqp"
+import (
+	"github.com/streadway/amqp"
+	"time"
+)
 
 type ClientConfig struct {
-	Host     string
-	Port     uint
-	Username string
-	Password string
+	Host       string
+	Port       uint
+	Username   string
+	Password   string
+	MaxRetry   uint
+	RetryDelay time.Duration
 }
 
 type ExchangeConfig struct {
@@ -33,7 +38,7 @@ type RabbitServerConfig struct {
 }
 
 type AMQPMessage struct {
-	AMQPDelivery amqp.Delivery
+	amqp.Delivery
 	Type         string
 	Microservice string
 	Entity       string

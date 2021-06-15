@@ -1,4 +1,4 @@
-package utils
+package gorabbit
 
 import (
 	"github.com/go-playground/assert/v2"
