@@ -1,6 +1,10 @@
 package gorabbit
 
 const (
+	RedeliveryHeader = "x-redelivered-count"
+)
+
+const (
 	TypeTopic   = "topic"
 	TypeDirect  = "direct"
 	TypeFanout  = "fanout"

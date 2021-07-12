@@ -1,3 +1,16 @@
+# 0.1.5
+Added redelivery and max retry feature
+* Added `RetryMessage` functionality that acknowledges an event then re-sends it to the same queue
+* Redelivered messages are acknowledged and then re-sent with incremented `x-redelivered-count` header
+* The redelivery strategy is based on the `x-redelivered-count` header of an event
+* Removed `connect` method from the client interface
+* Renamed `SendEvent` method to `SendMessage`
+* Renamed `SubscribeToEvents` method to `SubscribeToMessages`
+* Renamed `NewMQTTClient` factory to `NewClient`
+* Introduced `NewClientDebug` factory that will enable logs
+* Introduced logs in all operations
+
+
 # 0.1.4
 * Renamed `MessageType` to `AMQPMessage`
 * `AMQPMessage` inherits `amqp.Delivery`

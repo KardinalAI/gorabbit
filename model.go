@@ -44,3 +44,26 @@ type AMQPMessage struct {
 	Entity       string
 	Action       string
 }
+
+func (msg *AMQPMessage) GetRedeliveryCount() int {
+	val, ok := msg.Headers[RedeliveryHeader]
+
+	if !ok {
+		return 0
+	} else {
+		return int(val.(int32))
+	}
+}
+
+func (msg *AMQPMessage) IncrementRedeliveryHeader() int {
+	redeliveredCount := msg.GetRedeliveryCount()
+	redeliveredCount++
+
+	newHeader := map[string]interface{}{
+		RedeliveryHeader: redeliveredCount,
+	}
+
+	msg.Headers = newHeader
+
+	return redeliveredCount
+}

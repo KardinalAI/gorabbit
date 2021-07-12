@@ -125,7 +125,7 @@ func loadYmlFileFromPath(path string) (*RabbitServerConfig, error) {
 }
 
 func initConnection(config ClientConfig) error {
-	_, err := NewMQTTClient(config)
+	_, err := NewClient(config)
 
 	if err != nil {
 		return err
