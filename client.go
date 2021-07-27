@@ -3,8 +3,8 @@ package gorabbit
 import (
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 	"github.com/streadway/amqp"
-	"gitlab.kardinal.ai/coretech/gorabbit/logging"
 	"time"
 )
 
@@ -16,6 +16,8 @@ var (
 	// Channel represents the AMQP channel
 	channel *amqp.Channel
 )
+
+type LogFields = map[string]interface{}
 
 type MQTTClient interface {
 	Disconnect() error
@@ -39,6 +41,9 @@ type mqttClient struct {
 
 	// Debug is a flag that activates logs for debugging
 	debug bool
+
+	// logger used only in debug mode
+	logger *logrus.Logger
 }
 
 // SendMessage will send the desired payload through the selected channel
@@ -51,7 +56,7 @@ func (client *mqttClient) SendMessage(exchange string, routingKey string, priori
 	if connection == nil || channel == nil {
 		// In debug mode, log the warning
 		if client.debug {
-			logging.Logger.Warn("connection or channel is nil, attempting to reconnect")
+			client.logger.Warn("connection or channel is nil, attempting to reconnect")
 		}
 
 		// Otherwise we need to connect again
@@ -60,7 +65,7 @@ func (client *mqttClient) SendMessage(exchange string, routingKey string, priori
 		if err != nil {
 			// In debug mode, log the error
 			if client.debug {
-				logging.Logger.WithError(err).Error("could not reconnect to rabbitMQ")
+				client.logger.WithError(err).Error("could not reconnect to rabbitMQ")
 			}
 
 			return err
@@ -88,7 +93,7 @@ func (client *mqttClient) SendMessage(exchange string, routingKey string, priori
 
 	// In debug mode, log the error
 	if err != nil && client.debug {
-		logging.Logger.WithError(err).Error("could not redeliver message")
+		client.logger.WithError(err).Error("could not redeliver message")
 	}
 
 	return err
@@ -105,7 +110,7 @@ func (client *mqttClient) SubscribeToMessages(queue string, consumer string, aut
 	if connection == nil || channel == nil {
 		// In debug mode, log the warning
 		if client.debug {
-			logging.Logger.Warn("connection or channel is nil, attempting to reconnect")
+			client.logger.Warn("connection or channel is nil, attempting to reconnect")
 		}
 
 		// Otherwise we need to connect again
@@ -114,7 +119,7 @@ func (client *mqttClient) SubscribeToMessages(queue string, consumer string, aut
 		if err != nil {
 			// In debug mode, log the error
 			if client.debug {
-				logging.Logger.WithError(err).Error("could not reconnect to rabbitMQ")
+				client.logger.WithError(err).Error("could not reconnect to rabbitMQ")
 			}
 
 			return nil, err
@@ -136,7 +141,7 @@ func (client *mqttClient) SubscribeToMessages(queue string, consumer string, aut
 	if err != nil {
 		// In debug mode, log the error
 		if client.debug {
-			logging.Logger.WithFields(logging.LogFields{
+			client.logger.WithFields(LogFields{
 				"queue":      queue,
 				"consumer":   consumer,
 				"autoAck":    autoAck,
@@ -153,7 +158,7 @@ func (client *mqttClient) SubscribeToMessages(queue string, consumer string, aut
 		for message := range messages {
 			// In debug mode, log the event
 			if client.debug {
-				logging.Logger.WithFields(logging.LogFields{
+				client.logger.WithFields(LogFields{
 					"messageId":   message.MessageId,
 					"deliverTag":  message.DeliveryTag,
 					"redelivered": message.Redelivered,
@@ -165,7 +170,7 @@ func (client *mqttClient) SubscribeToMessages(queue string, consumer string, aut
 			if parseErr == nil {
 				// In debug mode, log the event
 				if client.debug {
-					logging.Logger.WithFields(logging.LogFields{
+					client.logger.WithFields(LogFields{
 						"type":         parsed.Type,
 						"microservice": parsed.Microservice,
 						"entity":       parsed.Entity,
@@ -177,7 +182,7 @@ func (client *mqttClient) SubscribeToMessages(queue string, consumer string, aut
 			} else {
 				// In debug mode, log the error
 				if client.debug {
-					logging.Logger.WithError(parseErr).Error("could not parse AMQP message, sending delivery with empty properties")
+					client.logger.WithError(parseErr).Error("could not parse AMQP message, sending delivery with empty properties")
 				}
 
 				parsedDeliveries <- AMQPMessage{
@@ -197,7 +202,7 @@ func (client *mqttClient) connect() error {
 
 	// In debug mode, log the infos
 	if client.debug {
-		logging.Logger.WithField("uri", dialUrl).Info("connecting to MQTT server")
+		client.logger.WithField("uri", dialUrl).Info("connecting to MQTT server")
 	}
 
 	conn, err := amqp.Dial(dialUrl)
@@ -205,7 +210,7 @@ func (client *mqttClient) connect() error {
 	if err != nil {
 		// In debug mode, log the error
 		if client.debug {
-			logging.Logger.WithError(err).Info("could not connect to MQTT server")
+			client.logger.WithError(err).Info("could not connect to MQTT server")
 		}
 
 		return err
@@ -218,7 +223,7 @@ func (client *mqttClient) connect() error {
 	if err != nil {
 		// In debug mode, log the error
 		if client.debug {
-			logging.Logger.WithError(err).Info("could not open unique channel")
+			client.logger.WithError(err).Info("could not open unique channel")
 		}
 
 		return err
@@ -228,7 +233,7 @@ func (client *mqttClient) connect() error {
 
 	// In debug mode, log the infos
 	if client.debug {
-		logging.Logger.Info("connection to MQTT server successful")
+		client.logger.Info("connection to MQTT server successful")
 	}
 
 	return nil
@@ -240,7 +245,7 @@ func (client *mqttClient) Disconnect() error {
 	if err != nil {
 		// In debug mode, log the error
 		if client.debug {
-			logging.Logger.WithError(err).Info("could not close the connection")
+			client.logger.WithError(err).Info("could not close the connection")
 		}
 
 		return err
@@ -257,7 +262,7 @@ func (client *mqttClient) RetryMessage(event *AMQPMessage, maxRetry int) error {
 	if err != nil {
 		// In debug mode, log the error
 		if client.debug {
-			logging.Logger.WithFields(logging.LogFields{
+			client.logger.WithFields(LogFields{
 				"messageId":  event.MessageId,
 				"stacktrace": err,
 			}).Info("could not acknowledge the event")
@@ -270,13 +275,13 @@ func (client *mqttClient) RetryMessage(event *AMQPMessage, maxRetry int) error {
 
 	// In debug mode, log the info
 	if client.debug {
-		logging.Logger.WithField("newRedeliveredCount", redeliveredCount).Info("incremented redelivered count")
+		client.logger.WithField("newRedeliveredCount", redeliveredCount).Info("incremented redelivered count")
 	}
 
 	if redeliveredCount <= maxRetry {
 		// In debug mode, log the info
 		if client.debug {
-			logging.Logger.Info("redelivering event")
+			client.logger.Info("redelivering event")
 		}
 
 		return client.redeliver(event)
@@ -293,7 +298,7 @@ func (client *mqttClient) redeliver(event *AMQPMessage) error {
 	if connection == nil || channel == nil {
 		// In debug mode, log the warning
 		if client.debug {
-			logging.Logger.Warn("connection or channel is nil, attempting to reconnect")
+			client.logger.Warn("connection or channel is nil, attempting to reconnect")
 		}
 
 		// Otherwise we need to connect again
@@ -302,7 +307,7 @@ func (client *mqttClient) redeliver(event *AMQPMessage) error {
 		if err != nil {
 			// In debug mode, log the error
 			if client.debug {
-				logging.Logger.WithError(err).Error("could not reconnect to rabbitMQ")
+				client.logger.WithError(err).Error("could not reconnect to rabbitMQ")
 			}
 
 			return err
@@ -328,7 +333,7 @@ func (client *mqttClient) redeliver(event *AMQPMessage) error {
 
 	// In debug mode, log the error
 	if err != nil && client.debug {
-		logging.Logger.WithError(err).Error("could not redeliver message")
+		client.logger.WithError(err).Error("could not redeliver message")
 	}
 
 	return err
@@ -355,7 +360,7 @@ func NewClient(config ClientConfig) (MQTTClient, error) {
 
 			// In debug mode, log the info
 			if client.debug {
-				logging.Logger.Info("retrying to connect to MQTT server")
+				client.logger.Info("retrying to connect to MQTT server")
 			}
 
 			return NewClient(config)
@@ -366,13 +371,14 @@ func NewClient(config ClientConfig) (MQTTClient, error) {
 	return client, nil
 }
 
-func NewClientDebug(config ClientConfig) (MQTTClient, error) {
+func NewClientDebug(config ClientConfig, logger *logrus.Logger) (MQTTClient, error) {
 	client := &mqttClient{
 		Host:     config.Host,
 		Port:     config.Port,
 		Username: config.Username,
 		Password: config.Password,
 		debug:    true,
+		logger:   logger,
 	}
 
 	err := client.connect()
@@ -387,10 +393,10 @@ func NewClientDebug(config ClientConfig) (MQTTClient, error) {
 
 			// In debug mode, log the info
 			if client.debug {
-				logging.Logger.Info("retrying to connect to MQTT server")
+				logger.Info("retrying to connect to MQTT server")
 			}
 
-			return NewClientDebug(config)
+			return NewClientDebug(config, logger)
 		}
 		return nil, err
 	}

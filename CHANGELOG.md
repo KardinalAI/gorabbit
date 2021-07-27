@@ -1,4 +1,12 @@
+# 1.0.0
+Official stable release of Gorabbit
+* Removed logging module
+* Modified `NewClientDebug` constructor to take a `logrus.Logger` logger as a parameter
+* Working and tested retry strategy for failed messages
+
 # 0.1.5
+(**NOTE**: This version has **Breaking Changes** and should have been released in v1.0.0)
+
 Added redelivery and max retry feature
 * Added `RetryMessage` functionality that acknowledges an event then re-sends it to the same queue
 * Redelivered messages are acknowledged and then re-sent with incremented `x-redelivered-count` header

@@ -27,12 +27,13 @@ go env -w GONOSUMDB="gitlab.kardinal.ai/*"
 
 ## Usage
 
-This module contains 3 main functionalities:
+This module contains 4 main functionalities:
 
 * Queues, Exchangers and Bindings Configurator from Struct
 * Queues, Exchangers and Bindings Configurator from YML
-* Event Sender
-* Event Subscriber
+* Message Sender
+* Message Subscriber
+* Failed Messages Retry Strategy
 
 ### Queues, Exchangers and Bindings Configurator from Struct
 
@@ -243,10 +244,15 @@ func main() {
 }
 ```
 
-## Event Sender
+## Message Sender
 
-To send an event through MQTT, you need to first declare a client that will automatically connect to the RabbitMQ
+To send a message through MQTT, you need to first declare a client that will automatically connect to the RabbitMQ
 server.
+
+Note that `MaxRetry` and `RetryDelay` are **optional** fields. If set, they will determine the behavior of the client if a first connection fails.
+
+The `MaxRetry` property will define the maximum number of times a client can try to connect if the initial connection fails.
+The `RetryDelay` property determines the delay between each connection retry.
 
 ```go
 var client gorabbit.MQTTClient
@@ -256,15 +262,28 @@ clientConfig := gorabbit.ClientConfig{
     Port:     5672,
     Username: "guest",
     Password: "guest",
+    MaxRetry: 5,
+    RetryDelay: 3 * time.seconds
 }
 
-c, err := gorabbit.NewMQTTClient(clientConfig)
+c, err := gorabbit.NewClient(clientConfig)
 
 if err != nil {
     panic(err.Error())
 }
 
 client = c
+```
+
+You can also initialize a client in **Debug** mode (with logs) as follows:
+
+```go
+logger := logrus.Logger{
+    Out:       os.Stdout,
+    Level:     logrus.DebugLevel,
+}
+
+c, err := gorabbit.NewClientDebug(clientConfig, logger)
 ```
 
 Once the client initialized, the connection and channel will be initialized but do not close at any point yet.
@@ -281,19 +300,19 @@ router.Run()
 ```
 if you intend to keep an open connection while the app is running.
 
-Once your client is initialized, to send an event simply call the integrated function as following:
+Once your client is initialized, to send a message simply call the integrated function as following:
 ```go
-client.SendEvent("exchange", "routingKey", gorabbit.PriorityLow, payload)
+client.SendMessage("exchange", "routingKey", gorabbit.PriorityLow, payload)
 ```
-where the payload should be a []byte
+where the payload should be a `[]byte`
 
-## Event Subscriber
+## Message Subscriber
 
 The client initialization is the same as the Event Sender.
 
-Once the client is initialized, you can subscribe to an event by using the integrated function as following:
+Once the client is initialized, you can subscribe to a queue of messages by using the integrated function as following:
 ```go
-messages, err := client.SubscribeToEvents("queue_name", "consumer_name", false)
+messages, err := client.SubscribeToMessages("queue_name", "consumer_name", false)
 ```
 
 where messages is an asynchronous incoming stream of events that needs to be properly consumed preferably in a go routine.
@@ -303,8 +322,8 @@ For example, if you are outside a Gin environment, you need to listen to the str
 forever := make(chan bool)
 
 go func() {
-	for d := range messages {
-		log.Printf("Received message: %s", d.Body)
+	for m := range messages {
+		log.Printf("Received message: %s", m.Body)
 	}
 }()
 	
@@ -313,7 +332,7 @@ go func() {
 
 whereas in Gin, the program itself is continuous, so creating a continuous loop is unnecessary, so you can get rid of the "forever" channel.
 
-The last parameter of this function is a boolean specifying whether you want events to be auto acknowledged or not.
+The last parameter of this function is a `boolean` specifying whether you want events to be auto acknowledged or not.
 
 If you wish not to auto aknowledge events, then you **must** acknowledge, reject or not acknowledge them manually:
 
@@ -323,9 +342,9 @@ ACK:
 message.Ack(multiple bool)
 ```
 ```go
-for d := range messages {
-	log.Printf("Received message: %s", d.Body)
-    err = d.Ack(false)
+for m := range messages {
+	log.Printf("Received message: %s", m.Body)
+    err = m.Ack(false)
 
     if err != nil {
         log.Fatal("could not acknowledge delivery")
@@ -340,9 +359,9 @@ NACK:
 message.Nack(multiple bool, requeue bool)
 ```
 ```go
-for d := range messages {
-	log.Printf("Received message: %s", d.Body)
-    err = d.Nack(false, true)
+for m := range messages {
+	log.Printf("Received message: %s", m.Body)
+    err = m.Nack(false, true)
 
     if err != nil {
         log.Fatal("could not nack delivery")
@@ -356,9 +375,9 @@ REJECT:
 message.Reject(requeue bool)
 ```
 ```go
-for d := range messages {
-	log.Printf("Received message: %s", d.Body)
-    err = d.Reject(true)
+for m := range messages {
+	log.Printf("Received message: %s", m.Body)
+    err = m.Reject(true)
 
     if err != nil {
         log.Fatal("could not reject delivery")
@@ -366,6 +385,21 @@ for d := range messages {
 }
 ```
 
+## Failed Messages Retry Strategy
+When one or more message fails to process, you can requeue them a given number
+of times (maximum retry indicator). The message(s) will be re-sent to the same queue
+with the same properties and payload, but with an updated `x-redelivered-count` header
+that will be incremented on each `retry`. When the message reaches the maximum given number
+of retries, it will be rejected and dropped.
+
+You can use the retry functionnality via the client's integrated `RetryMessage` method:
+
+```go
+client.RetryMessage(&message, 5)
+```
+
+In that example, `5` is the maximum number of times a message can be redelivered.
+When that limit is reached, the message will be rejected and dropped.
 
 ## Launch Local RabbitMQ Server
 
