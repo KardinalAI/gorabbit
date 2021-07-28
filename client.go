@@ -1,6 +1,7 @@
 package gorabbit
 
 import (
+	"errors"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -24,6 +25,10 @@ type MQTTClient interface {
 	SendMessage(exchange string, routingKey string, priority uint8, payload []byte) error
 	RetryMessage(event *AMQPMessage, maxRetry int) error
 	SubscribeToMessages(queue string, consumer string, autoAck bool) (<-chan AMQPMessage, error)
+	CreateQueue(config QueueConfig) error
+	CreateExchange(config ExchangeConfig) error
+	BindExchangeToQueueViaRoutingKey(exchange, queue, routingKey string) error
+	QueueIsEmpty(config QueueConfig) (bool, error)
 }
 
 type mqttClient struct {
@@ -337,6 +342,89 @@ func (client *mqttClient) redeliver(event *AMQPMessage) error {
 	}
 
 	return err
+}
+
+// CreateQueue creates a new queue programmatically event though the MQTT
+// server is already launched
+func (client *mqttClient) CreateQueue(config QueueConfig) error {
+	if channel == nil {
+		return errors.New("mqtt channel is closed")
+	}
+
+	_, err := channel.QueueDeclare(
+		config.Name,
+		config.Durable,
+		false,
+		config.Exclusive,
+		false,
+		nil,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// CreateExchange creates a new exchange programmatically event though the MQTT
+// server is already launched
+func (client *mqttClient) CreateExchange(config ExchangeConfig) error {
+	if channel == nil {
+		return errors.New("mqtt channel is closed")
+	}
+
+	err := channel.ExchangeDeclare(
+		config.Name,
+		config.Type,
+		config.Persisted,
+		!config.Persisted,
+		false,
+		false,
+		nil,
+	)
+
+	return err
+}
+
+// BindExchangeToQueueViaRoutingKey binds an exchange to a queue via a given routingKey
+//programmatically event though the MQTT server is already launched
+func (client *mqttClient) BindExchangeToQueueViaRoutingKey(exchange, queue, routingKey string) error {
+	if channel == nil {
+		return errors.New("mqtt channel is closed")
+	}
+
+	err := channel.QueueBind(
+		queue,
+		routingKey,
+		exchange,
+		false,
+		nil,
+	)
+
+	return err
+}
+
+// QueueIsEmpty check if a queue exists then check if it contains messages
+func (client *mqttClient) QueueIsEmpty(config QueueConfig) (bool, error) {
+	if channel == nil {
+		return true, errors.New("mqtt channel is closed")
+	}
+
+	q, err := channel.QueueDeclarePassive(
+		config.Name,
+		config.Durable,
+		false,
+		config.Exclusive,
+		false,
+		nil,
+	)
+
+	if err != nil {
+		return true, err
+	}
+
+	return q.Messages == 0, nil
 }
 
 func NewClient(config ClientConfig) (MQTTClient, error) {
