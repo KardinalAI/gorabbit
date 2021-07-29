@@ -355,7 +355,7 @@ func (client *mqttClient) CreateQueue(config QueueConfig) error {
 		return errors.New("mqtt channel is closed")
 	}
 
-	err := declareQueue(config)
+	err := client.declareQueue(config)
 
 	if err != nil {
 		return err
@@ -363,7 +363,7 @@ func (client *mqttClient) CreateQueue(config QueueConfig) error {
 
 	if config.Bindings != nil {
 		for _, binding := range *config.Bindings {
-			err = addQueueBinding(config.Name, binding.RoutingKey, binding.Exchange)
+			err = client.addQueueBinding(config.Name, binding.RoutingKey, binding.Exchange)
 
 			if err != nil {
 				return err
@@ -381,7 +381,7 @@ func (client *mqttClient) CreateExchange(config ExchangeConfig) error {
 		return errors.New("mqtt channel is closed")
 	}
 
-	return declareExchange(config)
+	return client.declareExchange(config)
 }
 
 // BindExchangeToQueueViaRoutingKey binds an exchange to a queue via a given routingKey
@@ -391,7 +391,7 @@ func (client *mqttClient) BindExchangeToQueueViaRoutingKey(exchange, queue, rout
 		return errors.New("mqtt channel is closed")
 	}
 
-	return addQueueBinding(queue, routingKey, exchange)
+	return client.addQueueBinding(queue, routingKey, exchange)
 }
 
 // QueueIsEmpty returns an error if the queue doesn't exists,
@@ -480,6 +480,52 @@ func (client *mqttClient) DeleteExchange(exchange string) error {
 	}
 
 	return channel.ExchangeDelete(exchange, false, false)
+}
+
+// declareExchange will initialize you exchange in the RabbitMQ server
+func (client *mqttClient) declareExchange(config ExchangeConfig) error {
+	err := channel.ExchangeDeclare(
+		config.Name,       // name
+		config.Type,       // type
+		config.Persisted,  // durable
+		!config.Persisted, // auto-deleted
+		false,             // internal
+		false,             // no-wait
+		nil,               // arguments
+	)
+
+	return err
+}
+
+// declareQueue will initialize you queue in the RabbitMQ server
+func (client *mqttClient) declareQueue(config QueueConfig) error {
+	_, err := channel.QueueDeclare(
+		config.Name,      // name
+		config.Durable,   // durable
+		false,            // delete when unused
+		config.Exclusive, // exclusive
+		false,            // no-wait
+		nil,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// addQueueBinding will bind a queue to an exchange via a specific routing key
+func (client *mqttClient) addQueueBinding(queue string, routingKey string, exchange string) error {
+	err := channel.QueueBind(
+		queue,
+		routingKey,
+		exchange,
+		false,
+		nil,
+	)
+
+	return err
 }
 
 func NewClient(config ClientConfig) (MQTTClient, error) {

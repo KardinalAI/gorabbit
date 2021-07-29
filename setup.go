@@ -7,19 +7,18 @@ import (
 
 func SetupMQTT(clientConfig ClientConfig, serverConfig RabbitServerConfig) error {
 	// First we initialize the connection to the AMQP server
-	err := initConnection(clientConfig)
+	client, err := NewClient(clientConfig)
 
 	if err != nil {
 		return err
 	}
 
 	// Defer connection and channel closing until the setup is executed
-	defer connection.Close()
-	defer channel.Close()
+	defer client.Disconnect()
 
 	// Loop through all declared exchanges to create them
 	for _, exchange := range serverConfig.Exchanges {
-		err = declareExchange(exchange)
+		err = client.CreateExchange(exchange)
 
 		if err != nil {
 			return err
@@ -28,7 +27,7 @@ func SetupMQTT(clientConfig ClientConfig, serverConfig RabbitServerConfig) error
 
 	// Loop through all declared queues to create them
 	for _, queue := range serverConfig.Queues {
-		err = declareQueue(queue)
+		err = client.CreateQueue(queue)
 
 		if err != nil {
 			return err
@@ -37,7 +36,7 @@ func SetupMQTT(clientConfig ClientConfig, serverConfig RabbitServerConfig) error
 		// Loop through all bindings to the queue to set them up
 		if queue.Bindings != nil {
 			for _, binding := range *queue.Bindings {
-				err = addQueueBinding(queue.Name, binding.RoutingKey, binding.Exchange)
+				err = client.BindExchangeToQueueViaRoutingKey(binding.Exchange, queue.Name, binding.RoutingKey)
 
 				if err != nil {
 					return err
@@ -57,47 +56,7 @@ func SetupMQTTFromYML(clientConfig ClientConfig, filePath string) error {
 		return err
 	}
 
-	// Then we initialize the connection to the AMQP server
-	err = initConnection(clientConfig)
-
-	if err != nil {
-		return err
-	}
-
-	// Defer connection and channel closing until the setup is executed
-	defer connection.Close()
-	defer channel.Close()
-
-	// Loop through all declared exchanges to create them
-	for _, exchange := range config.Exchanges {
-		err = declareExchange(exchange)
-
-		if err != nil {
-			return err
-		}
-	}
-
-	// Loop through all declared queues to create them
-	for _, queue := range config.Queues {
-		err = declareQueue(queue)
-
-		if err != nil {
-			return err
-		}
-
-		// Loop through all bindings to the queue to set them up
-		if queue.Bindings != nil {
-			for _, binding := range *queue.Bindings {
-				err = addQueueBinding(queue.Name, binding.RoutingKey, binding.Exchange)
-
-				if err != nil {
-					return err
-				}
-			}
-		}
-	}
-
-	return nil
+	return SetupMQTT(clientConfig, *config)
 }
 
 func loadYmlFileFromPath(path string) (*RabbitServerConfig, error) {
@@ -122,60 +81,4 @@ func loadYmlFileFromPath(path string) (*RabbitServerConfig, error) {
 	}
 
 	return &config, nil
-}
-
-func initConnection(config ClientConfig) error {
-	_, err := NewClient(config)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// declareExchange will initialize you exchange in the RabbitMQ server
-func declareExchange(config ExchangeConfig) error {
-	err := channel.ExchangeDeclare(
-		config.Name,       // name
-		config.Type,       // type
-		config.Persisted,  // durable
-		!config.Persisted, // auto-deleted
-		false,             // internal
-		false,             // no-wait
-		nil,               // arguments
-	)
-
-	return err
-}
-
-// declareQueue will initialize you queue in the RabbitMQ server
-func declareQueue(config QueueConfig) error {
-	_, err := channel.QueueDeclare(
-		config.Name,      // name
-		config.Durable,   // durable
-		false,            // delete when unused
-		config.Exclusive, // exclusive
-		false,            // no-wait
-		nil,
-	)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// addQueueBinding will bind a queue to an exchange via a specific routing key
-func addQueueBinding(queue string, routingKey string, exchange string) error {
-	err := channel.QueueBind(
-		queue,
-		routingKey,
-		exchange,
-		false,
-		nil,
-	)
-
-	return err
 }
