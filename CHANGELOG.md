@@ -1,3 +1,19 @@
+# 1.1.0
+Added support for dynamic queue, exchange et binding management
+* MQTT Client new methods:
+    * New `CreateQueue`: Creates a queue from given configuration
+    * New `CreateExchange`: Creates exchange from given configuration
+    * New `BindExchangeToQueueViaRoutingKey`: Binds exchange to queue via given routing key
+    * New `QueueIsEmpty`: Returns whether a queue is empty or not. Returns an error if the queue doesn't exist
+    * New `GetNumberOfMessages`: Returns the number of messages contained in a queue. Returns an error if the queue doesn't exist
+    * New `PurgeQueue`: Purges all messages from a queue. Returns an error if the queue doesn't exist
+    * New `DeleteQueue`: Deletes a queue. Returns an error if the queue doesn't exist
+    * New `QueueIsEmpty`: Deletes an exchange. Returns an error if the exchange doesn't exist
+* MQTT Setup simplifications:
+    * Use MQTT Client for setup operations
+    * Moved helper functions `declareExchange`, `declareQueue` and `addQueueBinding` to MQTT Client as private methods.
+
+
 # 1.0.0
 Official stable release of Gorabbit
 * Removed logging module
