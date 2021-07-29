@@ -29,6 +29,10 @@ type MQTTClient interface {
 	CreateExchange(config ExchangeConfig) error
 	BindExchangeToQueueViaRoutingKey(exchange, queue, routingKey string) error
 	QueueIsEmpty(config QueueConfig) (bool, error)
+	GetNumberOfMessages(config QueueConfig) (int, error)
+	PurgeQueue(queue string) error
+	DeleteQueue(queue string) error
+	DeleteExchange(exchange string) error
 }
 
 type mqttClient struct {
@@ -351,17 +355,20 @@ func (client *mqttClient) CreateQueue(config QueueConfig) error {
 		return errors.New("mqtt channel is closed")
 	}
 
-	_, err := channel.QueueDeclare(
-		config.Name,
-		config.Durable,
-		false,
-		config.Exclusive,
-		false,
-		nil,
-	)
+	err := declareQueue(config)
 
 	if err != nil {
 		return err
+	}
+
+	if config.Bindings != nil {
+		for _, binding := range *config.Bindings {
+			err = addQueueBinding(config.Name, binding.RoutingKey, binding.Exchange)
+
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
@@ -374,17 +381,7 @@ func (client *mqttClient) CreateExchange(config ExchangeConfig) error {
 		return errors.New("mqtt channel is closed")
 	}
 
-	err := channel.ExchangeDeclare(
-		config.Name,
-		config.Type,
-		config.Persisted,
-		!config.Persisted,
-		false,
-		false,
-		nil,
-	)
-
-	return err
+	return declareExchange(config)
 }
 
 // BindExchangeToQueueViaRoutingKey binds an exchange to a queue via a given routingKey
@@ -394,18 +391,11 @@ func (client *mqttClient) BindExchangeToQueueViaRoutingKey(exchange, queue, rout
 		return errors.New("mqtt channel is closed")
 	}
 
-	err := channel.QueueBind(
-		queue,
-		routingKey,
-		exchange,
-		false,
-		nil,
-	)
-
-	return err
+	return addQueueBinding(queue, routingKey, exchange)
 }
 
-// QueueIsEmpty check if a queue exists then check if it contains messages
+// QueueIsEmpty returns an error if the queue doesn't exists,
+// then check if it contains messages
 func (client *mqttClient) QueueIsEmpty(config QueueConfig) (bool, error) {
 	if channel == nil {
 		return true, errors.New("mqtt channel is closed")
@@ -425,6 +415,71 @@ func (client *mqttClient) QueueIsEmpty(config QueueConfig) (bool, error) {
 	}
 
 	return q.Messages == 0, nil
+}
+
+// GetNumberOfMessages returns an error if the queue doesn't exists, and the number
+// of messages if it does
+func (client *mqttClient) GetNumberOfMessages(config QueueConfig) (int, error) {
+	if channel == nil {
+		return 0, errors.New("mqtt channel is closed")
+	}
+
+	q, err := channel.QueueDeclarePassive(
+		config.Name,
+		config.Durable,
+		false,
+		config.Exclusive,
+		false,
+		nil,
+	)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return q.Messages, nil
+}
+
+// PurgeQueue will empty the given queue. An error is returned if the queue
+// does not exist
+func (client *mqttClient) PurgeQueue(queue string) error {
+	if channel == nil {
+		return errors.New("mqtt channel is closed")
+	}
+
+	_, err := channel.QueuePurge(queue, false)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// DeleteQueue will delete the given queue. An error is returned if the queue
+// does not exist
+func (client *mqttClient) DeleteQueue(queue string) error {
+	if channel == nil {
+		return errors.New("mqtt channel is closed")
+	}
+
+	_, err := channel.QueueDelete(queue, false, false, false)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// DeleteExchange will delete the given exchange. An error is returned if the exchange
+// does not exist
+func (client *mqttClient) DeleteExchange(exchange string) error {
+	if channel == nil {
+		return errors.New("mqtt channel is closed")
+	}
+
+	return channel.ExchangeDelete(exchange, false, false)
 }
 
 func NewClient(config ClientConfig) (MQTTClient, error) {
