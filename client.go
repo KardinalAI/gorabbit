@@ -30,6 +30,7 @@ type MQTTClient interface {
 	BindExchangeToQueueViaRoutingKey(exchange, queue, routingKey string) error
 	QueueIsEmpty(config QueueConfig) (bool, error)
 	GetNumberOfMessages(config QueueConfig) (int, error)
+	PopMessageFromQueue(queue string, autoAck bool) (*AMQPMessage, error)
 	PurgeQueue(queue string) error
 	DeleteQueue(queue string) error
 	DeleteExchange(exchange string) error
@@ -438,6 +439,32 @@ func (client *mqttClient) GetNumberOfMessages(config QueueConfig) (int, error) {
 	}
 
 	return q.Messages, nil
+}
+
+func (client *mqttClient) PopMessageFromQueue(queue string, autoAck bool) (*AMQPMessage, error) {
+	if channel == nil {
+		return nil, errors.New("mqtt channel is closed")
+	}
+
+	m, ok, err := channel.Get(queue, autoAck)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if !ok {
+		return nil, errors.New("queue is empty")
+	}
+
+	parsed, parseErr := ParseMessage(m)
+
+	if parseErr != nil {
+		return &AMQPMessage{
+			Delivery: m,
+		}, nil
+	}
+
+	return parsed, nil
 }
 
 // PurgeQueue will empty the given queue. An error is returned if the queue
