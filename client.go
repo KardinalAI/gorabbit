@@ -1,6 +1,7 @@
 package gorabbit
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
@@ -22,9 +23,10 @@ type LogFields = map[string]interface{}
 
 type MQTTClient interface {
 	Disconnect() error
+	NotifyClose() chan *amqp.Error
 	SendMessage(exchange string, routingKey string, priority uint8, payload []byte) error
 	RetryMessage(event *AMQPMessage, maxRetry int) error
-	SubscribeToMessages(queue string, consumer string, autoAck bool) (<-chan AMQPMessage, error)
+	SubscribeToMessages(ctx context.Context, queue string, consumer string, autoAck bool) (<-chan AMQPMessage, error)
 	CreateQueue(config QueueConfig) error
 	CreateExchange(config ExchangeConfig) error
 	BindExchangeToQueueViaRoutingKey(exchange, queue, routingKey string) error
@@ -115,7 +117,7 @@ func (client *mqttClient) SendMessage(exchange string, routingKey string, priori
 // consumer[optional] is the unique identifier of the consumer. Leaving it empty will generate a unique identifier
 // if autoAck is set to true, received events will be auto acknowledged as soon as they are consumed (received)
 // returns an incoming channel of AMQPMessage (messages)
-func (client *mqttClient) SubscribeToMessages(queue string, consumer string, autoAck bool) (<-chan AMQPMessage, error) {
+func (client *mqttClient) SubscribeToMessages(ctx context.Context, queue string, consumer string, autoAck bool) (<-chan AMQPMessage, error) {
 	// Before sending a message, we need to make sure that Connection and Channel are valid
 	if connection == nil || channel == nil {
 		// In debug mode, log the warning
@@ -165,38 +167,50 @@ func (client *mqttClient) SubscribeToMessages(queue string, consumer string, aut
 	parsedDeliveries := make(chan AMQPMessage)
 
 	go func() {
-		for message := range messages {
-			// In debug mode, log the event
-			if client.debug {
-				client.logger.WithFields(LogFields{
-					"messageId":   message.MessageId,
-					"deliverTag":  message.DeliveryTag,
-					"redelivered": message.Redelivered,
-				}).Info("received amqp delivery")
-			}
-
-			parsed, parseErr := ParseMessage(message)
-
-			if parseErr == nil {
+		for {
+			select {
+			case <-ctx.Done():
 				// In debug mode, log the event
 				if client.debug {
 					client.logger.WithFields(LogFields{
-						"type":         parsed.Type,
-						"microservice": parsed.Microservice,
-						"entity":       parsed.Entity,
-						"action":       parsed.Action,
-					}).Info("AMQP message successfully parsed and sent")
+						"queue":    queue,
+						"consumer": consumer,
+					}).Error("message channel done")
 				}
-
-				parsedDeliveries <- *parsed
-			} else {
-				// In debug mode, log the error
+				return
+			case message := <-messages:
+				// In debug mode, log the event
 				if client.debug {
-					client.logger.WithError(parseErr).Error("could not parse AMQP message, sending delivery with empty properties")
+					client.logger.WithFields(LogFields{
+						"messageId":   message.MessageId,
+						"deliverTag":  message.DeliveryTag,
+						"redelivered": message.Redelivered,
+					}).Info("received amqp delivery")
 				}
 
-				parsedDeliveries <- AMQPMessage{
-					Delivery: message,
+				parsed, parseErr := ParseMessage(message)
+
+				if parseErr == nil {
+					// In debug mode, log the event
+					if client.debug {
+						client.logger.WithFields(LogFields{
+							"type":         parsed.Type,
+							"microservice": parsed.Microservice,
+							"entity":       parsed.Entity,
+							"action":       parsed.Action,
+						}).Info("AMQP message successfully parsed and sent")
+					}
+
+					parsedDeliveries <- *parsed
+				} else {
+					// In debug mode, log the error
+					if client.debug {
+						client.logger.WithError(parseErr).Error("could not parse AMQP message, sending delivery with empty properties")
+					}
+
+					parsedDeliveries <- AMQPMessage{
+						Delivery: message,
+					}
 				}
 			}
 		}
@@ -239,6 +253,17 @@ func (client *mqttClient) connect() error {
 		return err
 	}
 
+	err = ch.Qos(10, 0, false)
+
+	if err != nil {
+		// In debug mode, log the error
+		if client.debug {
+			client.logger.WithError(err).Info("Failed to set QoS")
+		}
+
+		return err
+	}
+
 	channel = ch
 
 	// In debug mode, log the infos
@@ -247,6 +272,10 @@ func (client *mqttClient) connect() error {
 	}
 
 	return nil
+}
+
+func (client *mqttClient) NotifyClose() chan *amqp.Error {
+	return connection.NotifyClose(make(chan *amqp.Error))
 }
 
 func (client *mqttClient) Disconnect() error {
