@@ -25,7 +25,7 @@ type MQTTClient interface {
 	Disconnect() error
 	NotifyClose() chan *amqp.Error
 	SendMessage(exchange string, routingKey string, priority uint8, payload []byte) error
-	RetryMessage(event *AMQPMessage, maxRetry int) error
+	RetryMessage(event *AMQPMessage, maxRetry int, withAck bool) error
 	SubscribeToMessages(ctx context.Context, queue string, consumer string, autoAck bool) (<-chan AMQPMessage, error)
 	CreateQueue(config QueueConfig) error
 	CreateExchange(config ExchangeConfig) error
@@ -275,7 +275,10 @@ func (client *mqttClient) connect() error {
 }
 
 func (client *mqttClient) NotifyClose() chan *amqp.Error {
-	return connection.NotifyClose(make(chan *amqp.Error))
+	errChan := make(chan *amqp.Error)
+	channel.NotifyClose(errChan)
+	connection.NotifyClose(errChan)
+	return errChan
 }
 
 func (client *mqttClient) Disconnect() error {
@@ -295,19 +298,21 @@ func (client *mqttClient) Disconnect() error {
 
 // RetryMessage will ack an incoming AMQPMessage event and redeliver it if the maxRetry
 // property is not exceeded
-func (client *mqttClient) RetryMessage(event *AMQPMessage, maxRetry int) error {
-	err := event.Ack(false)
+func (client *mqttClient) RetryMessage(event *AMQPMessage, maxRetry int, withAck bool) error {
+	if withAck {
+		err := event.Ack(false)
 
-	if err != nil {
-		// In debug mode, log the error
-		if client.debug {
-			client.logger.WithFields(LogFields{
-				"messageId":  event.MessageId,
-				"stacktrace": err,
-			}).Info("could not acknowledge the event")
+		if err != nil {
+			// In debug mode, log the error
+			if client.debug {
+				client.logger.WithFields(LogFields{
+					"messageId":  event.MessageId,
+					"stacktrace": err,
+				}).Info("could not acknowledge the event")
+			}
+
+			return err
 		}
-
-		return err
 	}
 
 	redeliveredCount := event.IncrementRedeliveryHeader()
