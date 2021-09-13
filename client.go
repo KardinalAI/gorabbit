@@ -1,9 +1,7 @@
 package gorabbit
 
 import (
-	"context"
 	"errors"
-	"fmt"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/streadway/amqp"
@@ -17,6 +15,14 @@ var (
 
 	// Channel represents the AMQP channel
 	channel *amqp.Channel
+
+	channelClosed bool
+
+	consumed map[uint64]time.Time
+
+	cacheTimeout = 10 * time.Second
+
+	cacheLimit = 2048
 )
 
 type LogFields = map[string]interface{}
@@ -25,8 +31,8 @@ type MQTTClient interface {
 	Disconnect() error
 	NotifyClose() chan *amqp.Error
 	SendMessage(exchange string, routingKey string, priority uint8, payload []byte) error
-	RetryMessage(event *AMQPMessage, maxRetry int, withAck bool) error
-	SubscribeToMessages(ctx context.Context, queue string, consumer string, autoAck bool) (<-chan AMQPMessage, error)
+	RetryMessage(event *AMQPMessage, maxRetry int) error
+	SubscribeToMessages(queue string, consumer string, autoAck bool) (<-chan AMQPMessage, error)
 	CreateQueue(config QueueConfig) error
 	CreateExchange(config ExchangeConfig) error
 	BindExchangeToQueueViaRoutingKey(exchange, queue, routingKey string) error
@@ -36,6 +42,9 @@ type MQTTClient interface {
 	PurgeQueue(queue string) error
 	DeleteQueue(queue string) error
 	DeleteExchange(exchange string) error
+	Ack(event AMQPMessage, multiple bool) error
+	Nack(event AMQPMessage, multiple bool, requeue bool) error
+	Reject(event AMQPMessage, requeue bool) error
 }
 
 type mqttClient struct {
@@ -65,10 +74,10 @@ type mqttClient struct {
 // payload is the object you want to send as a byte array
 func (client *mqttClient) SendMessage(exchange string, routingKey string, priority uint8, payload []byte) error {
 	// Before sending a message, we need to make sure that Connection and Channel are valid
-	if connection == nil || channel == nil {
+	if !client.isOperational() {
 		// In debug mode, log the warning
 		if client.debug {
-			client.logger.Warn("connection or channel is nil, attempting to reconnect")
+			client.logger.Warn("connection or channel closed, attempting to reconnect")
 		}
 
 		// Otherwise we need to connect again
@@ -100,6 +109,7 @@ func (client *mqttClient) SendMessage(exchange string, routingKey string, priori
 			Headers: map[string]interface{}{
 				RedeliveryHeader: 0,
 			},
+			Timestamp: time.Now(),
 		},
 	)
 
@@ -117,9 +127,9 @@ func (client *mqttClient) SendMessage(exchange string, routingKey string, priori
 // consumer[optional] is the unique identifier of the consumer. Leaving it empty will generate a unique identifier
 // if autoAck is set to true, received events will be auto acknowledged as soon as they are consumed (received)
 // returns an incoming channel of AMQPMessage (messages)
-func (client *mqttClient) SubscribeToMessages(ctx context.Context, queue string, consumer string, autoAck bool) (<-chan AMQPMessage, error) {
+func (client *mqttClient) SubscribeToMessages(queue string, consumer string, autoAck bool) (<-chan AMQPMessage, error) {
 	// Before sending a message, we need to make sure that Connection and Channel are valid
-	if connection == nil || channel == nil {
+	if !client.isOperational() {
 		// In debug mode, log the warning
 		if client.debug {
 			client.logger.Warn("connection or channel is nil, attempting to reconnect")
@@ -167,50 +177,38 @@ func (client *mqttClient) SubscribeToMessages(ctx context.Context, queue string,
 	parsedDeliveries := make(chan AMQPMessage)
 
 	go func() {
-		for {
-			select {
-			case <-ctx.Done():
+		for message := range messages {
+			// In debug mode, log the event
+			if client.debug {
+				client.logger.WithFields(LogFields{
+					"messageId":   message.MessageId,
+					"deliverTag":  message.DeliveryTag,
+					"redelivered": message.Redelivered,
+				}).Info("received amqp delivery")
+			}
+
+			parsed, parseErr := ParseMessage(message)
+
+			if parseErr == nil {
 				// In debug mode, log the event
 				if client.debug {
 					client.logger.WithFields(LogFields{
-						"queue":    queue,
-						"consumer": consumer,
-					}).Error("message channel done")
+						"type":         parsed.Type,
+						"microservice": parsed.Microservice,
+						"entity":       parsed.Entity,
+						"action":       parsed.Action,
+					}).Info("AMQP message successfully parsed and sent")
 				}
-				return
-			case message := <-messages:
-				// In debug mode, log the event
+
+				parsedDeliveries <- *parsed
+			} else {
+				// In debug mode, log the error
 				if client.debug {
-					client.logger.WithFields(LogFields{
-						"messageId":   message.MessageId,
-						"deliverTag":  message.DeliveryTag,
-						"redelivered": message.Redelivered,
-					}).Info("received amqp delivery")
+					client.logger.WithError(parseErr).Error("could not parse AMQP message, sending delivery with empty properties")
 				}
 
-				parsed, parseErr := ParseMessage(message)
-
-				if parseErr == nil {
-					// In debug mode, log the event
-					if client.debug {
-						client.logger.WithFields(LogFields{
-							"type":         parsed.Type,
-							"microservice": parsed.Microservice,
-							"entity":       parsed.Entity,
-							"action":       parsed.Action,
-						}).Info("AMQP message successfully parsed and sent")
-					}
-
-					parsedDeliveries <- *parsed
-				} else {
-					// In debug mode, log the error
-					if client.debug {
-						client.logger.WithError(parseErr).Error("could not parse AMQP message, sending delivery with empty properties")
-					}
-
-					parsedDeliveries <- AMQPMessage{
-						Delivery: message,
-					}
+				parsedDeliveries <- AMQPMessage{
+					Delivery: message,
 				}
 			}
 		}
@@ -219,100 +217,51 @@ func (client *mqttClient) SubscribeToMessages(ctx context.Context, queue string,
 	return parsedDeliveries, nil
 }
 
-// connect will initialize the AMQP connection, Connection and Channel
-// given a configuration
-func (client *mqttClient) connect() error {
-	dialUrl := fmt.Sprintf("amqp://%s:%s@%s:%d/", client.Username, client.Password, client.Host, client.Port)
-
-	// In debug mode, log the infos
-	if client.debug {
-		client.logger.WithField("uri", dialUrl).Info("connecting to MQTT server")
-	}
-
-	conn, err := amqp.Dial(dialUrl)
-
-	if err != nil {
-		// In debug mode, log the error
-		if client.debug {
-			client.logger.WithError(err).Info("could not connect to MQTT server")
-		}
-
-		return err
-	}
-
-	connection = conn
-
-	ch, err := conn.Channel()
-
-	if err != nil {
-		// In debug mode, log the error
-		if client.debug {
-			client.logger.WithError(err).Info("could not open unique channel")
-		}
-
-		return err
-	}
-
-	err = ch.Qos(10, 0, false)
-
-	if err != nil {
-		// In debug mode, log the error
-		if client.debug {
-			client.logger.WithError(err).Info("Failed to set QoS")
-		}
-
-		return err
-	}
-
-	channel = ch
-
-	// In debug mode, log the infos
-	if client.debug {
-		client.logger.Info("connection to MQTT server successful")
-	}
-
-	return nil
-}
-
 func (client *mqttClient) NotifyClose() chan *amqp.Error {
 	errChan := make(chan *amqp.Error)
-	channel.NotifyClose(errChan)
-	connection.NotifyClose(errChan)
+
+	if client.isOperational() {
+		channel.NotifyClose(errChan)
+		connection.NotifyClose(errChan)
+	}
+
 	return errChan
 }
 
 func (client *mqttClient) Disconnect() error {
-	err := connection.Close()
-
-	if err != nil {
-		// In debug mode, log the error
-		if client.debug {
-			client.logger.WithError(err).Info("could not close the connection")
-		}
-
-		return err
-	}
-
-	return channel.Close()
-}
-
-// RetryMessage will ack an incoming AMQPMessage event and redeliver it if the maxRetry
-// property is not exceeded
-func (client *mqttClient) RetryMessage(event *AMQPMessage, maxRetry int, withAck bool) error {
-	if withAck {
-		err := event.Ack(false)
+	if !channelClosed {
+		err := connection.Close()
 
 		if err != nil {
 			// In debug mode, log the error
 			if client.debug {
-				client.logger.WithFields(LogFields{
-					"messageId":  event.MessageId,
-					"stacktrace": err,
-				}).Info("could not acknowledge the event")
+				client.logger.WithError(err).Info("could not close the connection")
 			}
 
 			return err
 		}
+
+		return nil
+	}
+
+	return errors.New("client connection or channel is already disconnected")
+}
+
+// RetryMessage will ack an incoming AMQPMessage event and redeliver it if the maxRetry
+// property is not exceeded
+func (client *mqttClient) RetryMessage(event *AMQPMessage, maxRetry int) error {
+	err := client.Ack(*event, false)
+
+	if err != nil {
+		// In debug mode, log the error
+		if client.debug {
+			client.logger.WithFields(LogFields{
+				"messageId":  event.MessageId,
+				"stacktrace": err,
+			}).Info("could not acknowledge the event")
+		}
+
+		return err
 	}
 
 	redeliveredCount := event.IncrementRedeliveryHeader()
@@ -334,60 +283,11 @@ func (client *mqttClient) RetryMessage(event *AMQPMessage, maxRetry int, withAck
 	return nil
 }
 
-// redeliver will resend an MQTT delivery from an acknowledged event
-// the event will be sent to the same queue via the same exchanger with
-// the same routing key. The event will also hold the same body and properties
-func (client *mqttClient) redeliver(event *AMQPMessage) error {
-	// Before sending a message, we need to make sure that Connection and Channel are valid
-	if connection == nil || channel == nil {
-		// In debug mode, log the warning
-		if client.debug {
-			client.logger.Warn("connection or channel is nil, attempting to reconnect")
-		}
-
-		// Otherwise we need to connect again
-		err := client.connect()
-
-		if err != nil {
-			// In debug mode, log the error
-			if client.debug {
-				client.logger.WithError(err).Error("could not reconnect to rabbitMQ")
-			}
-
-			return err
-		}
-	}
-
-	// Publish the message via the official amqp package
-	// with our given configuration
-	err := channel.Publish(
-		event.Exchange,   // exchange
-		event.RoutingKey, // routing key
-		false,            // mandatory
-		false,            // immediate
-		amqp.Publishing{
-			ContentType: event.ContentType,
-			Body:        event.Body,
-			Type:        event.RoutingKey,
-			Priority:    event.Priority,
-			MessageId:   event.MessageId,
-			Headers:     event.Headers,
-		},
-	)
-
-	// In debug mode, log the error
-	if err != nil && client.debug {
-		client.logger.WithError(err).Error("could not redeliver message")
-	}
-
-	return err
-}
-
 // CreateQueue creates a new queue programmatically event though the MQTT
 // server is already launched
 func (client *mqttClient) CreateQueue(config QueueConfig) error {
-	if channel == nil {
-		return errors.New("mqtt channel is closed")
+	if !client.isOperational() {
+		return errors.New("client connection or channel is down")
 	}
 
 	err := client.declareQueue(config)
@@ -412,8 +312,8 @@ func (client *mqttClient) CreateQueue(config QueueConfig) error {
 // CreateExchange creates a new exchange programmatically event though the MQTT
 // server is already launched
 func (client *mqttClient) CreateExchange(config ExchangeConfig) error {
-	if channel == nil {
-		return errors.New("mqtt channel is closed")
+	if !client.isOperational() {
+		return errors.New("client connection or channel is down")
 	}
 
 	return client.declareExchange(config)
@@ -422,8 +322,8 @@ func (client *mqttClient) CreateExchange(config ExchangeConfig) error {
 // BindExchangeToQueueViaRoutingKey binds an exchange to a queue via a given routingKey
 //programmatically event though the MQTT server is already launched
 func (client *mqttClient) BindExchangeToQueueViaRoutingKey(exchange, queue, routingKey string) error {
-	if channel == nil {
-		return errors.New("mqtt channel is closed")
+	if !client.isOperational() {
+		return errors.New("client connection or channel is down")
 	}
 
 	return client.addQueueBinding(queue, routingKey, exchange)
@@ -432,8 +332,8 @@ func (client *mqttClient) BindExchangeToQueueViaRoutingKey(exchange, queue, rout
 // QueueIsEmpty returns an error if the queue doesn't exists,
 // then check if it contains messages
 func (client *mqttClient) QueueIsEmpty(config QueueConfig) (bool, error) {
-	if channel == nil {
-		return true, errors.New("mqtt channel is closed")
+	if !client.isOperational() {
+		return false, errors.New("client connection or channel is down")
 	}
 
 	q, err := channel.QueueDeclarePassive(
@@ -455,8 +355,8 @@ func (client *mqttClient) QueueIsEmpty(config QueueConfig) (bool, error) {
 // GetNumberOfMessages returns an error if the queue doesn't exists, and the number
 // of messages if it does
 func (client *mqttClient) GetNumberOfMessages(config QueueConfig) (int, error) {
-	if channel == nil {
-		return 0, errors.New("mqtt channel is closed")
+	if !client.isOperational() {
+		return 0, errors.New("client connection or channel is down")
 	}
 
 	q, err := channel.QueueDeclarePassive(
@@ -476,8 +376,8 @@ func (client *mqttClient) GetNumberOfMessages(config QueueConfig) (int, error) {
 }
 
 func (client *mqttClient) PopMessageFromQueue(queue string, autoAck bool) (*AMQPMessage, error) {
-	if channel == nil {
-		return nil, errors.New("mqtt channel is closed")
+	if !client.isOperational() {
+		return nil, errors.New("client connection or channel is down")
 	}
 
 	m, ok, err := channel.Get(queue, autoAck)
@@ -504,8 +404,8 @@ func (client *mqttClient) PopMessageFromQueue(queue string, autoAck bool) (*AMQP
 // PurgeQueue will empty the given queue. An error is returned if the queue
 // does not exist
 func (client *mqttClient) PurgeQueue(queue string) error {
-	if channel == nil {
-		return errors.New("mqtt channel is closed")
+	if !client.isOperational() {
+		return errors.New("client connection or channel is down")
 	}
 
 	_, err := channel.QueuePurge(queue, false)
@@ -520,8 +420,8 @@ func (client *mqttClient) PurgeQueue(queue string) error {
 // DeleteQueue will delete the given queue. An error is returned if the queue
 // does not exist
 func (client *mqttClient) DeleteQueue(queue string) error {
-	if channel == nil {
-		return errors.New("mqtt channel is closed")
+	if !client.isOperational() {
+		return errors.New("client connection or channel is down")
 	}
 
 	_, err := channel.QueueDelete(queue, false, false, false)
@@ -536,57 +436,59 @@ func (client *mqttClient) DeleteQueue(queue string) error {
 // DeleteExchange will delete the given exchange. An error is returned if the exchange
 // does not exist
 func (client *mqttClient) DeleteExchange(exchange string) error {
-	if channel == nil {
-		return errors.New("mqtt channel is closed")
+	if !client.isOperational() {
+		return errors.New("client connection or channel is down")
 	}
 
 	return channel.ExchangeDelete(exchange, false, false)
 }
 
-// declareExchange will initialize you exchange in the RabbitMQ server
-func (client *mqttClient) declareExchange(config ExchangeConfig) error {
-	err := channel.ExchangeDeclare(
-		config.Name,       // name
-		config.Type,       // type
-		config.Persisted,  // durable
-		!config.Persisted, // auto-deleted
-		false,             // internal
-		false,             // no-wait
-		nil,               // arguments
-	)
+func (client *mqttClient) Ack(event AMQPMessage, multiple bool) error {
+	if _, ok := consumed[event.DeliveryTag]; ok {
+		return errors.New("message already consumed")
+	}
 
-	return err
-}
-
-// declareQueue will initialize you queue in the RabbitMQ server
-func (client *mqttClient) declareQueue(config QueueConfig) error {
-	_, err := channel.QueueDeclare(
-		config.Name,      // name
-		config.Durable,   // durable
-		false,            // delete when unused
-		config.Exclusive, // exclusive
-		false,            // no-wait
-		nil,
-	)
+	err := event.Ack(multiple)
 
 	if err != nil {
 		return err
 	}
 
+	client.cacheConsumedMessage(event.DeliveryTag)
+
 	return nil
 }
 
-// addQueueBinding will bind a queue to an exchange via a specific routing key
-func (client *mqttClient) addQueueBinding(queue string, routingKey string, exchange string) error {
-	err := channel.QueueBind(
-		queue,
-		routingKey,
-		exchange,
-		false,
-		nil,
-	)
+func (client *mqttClient) Nack(event AMQPMessage, multiple bool, requeue bool) error {
+	if _, ok := consumed[event.DeliveryTag]; ok {
+		return errors.New("message already consumed")
+	}
 
-	return err
+	err := event.Nack(multiple, requeue)
+
+	if err != nil {
+		return err
+	}
+
+	client.cacheConsumedMessage(event.DeliveryTag)
+
+	return nil
+}
+
+func (client *mqttClient) Reject(event AMQPMessage, requeue bool) error {
+	if _, ok := consumed[event.DeliveryTag]; ok {
+		return errors.New("message already consumed")
+	}
+
+	err := event.Reject(requeue)
+
+	if err != nil {
+		return err
+	}
+
+	client.cacheConsumedMessage(event.DeliveryTag)
+
+	return nil
 }
 
 func NewClient(config ClientConfig) (MQTTClient, error) {
@@ -617,6 +519,9 @@ func NewClient(config ClientConfig) (MQTTClient, error) {
 		}
 		return nil, err
 	}
+
+	consumed = make(map[uint64]time.Time)
+	go client.launchCacheCleanup()
 
 	return client, nil
 }
@@ -650,6 +555,9 @@ func NewClientDebug(config ClientConfig, logger *logrus.Logger) (MQTTClient, err
 		}
 		return nil, err
 	}
+
+	consumed = make(map[uint64]time.Time)
+	go client.launchCacheCleanup()
 
 	return client, nil
 }
