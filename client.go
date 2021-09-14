@@ -16,20 +16,20 @@ var (
 	// Channel represents the AMQP channel
 	channel *amqp.Channel
 
-	channelClosed bool
+	consumed *TTLMap
 
-	consumed map[uint64]time.Time
+	cacheTTL = 8 * time.Second
 
-	cacheTimeout = 10 * time.Second
+	cacheLimit = 1024
 
-	cacheLimit = 2048
+	statusChannel chan ConnectionStatus
 )
 
 type LogFields = map[string]interface{}
 
 type MQTTClient interface {
 	Disconnect() error
-	NotifyClose() chan *amqp.Error
+	ListenStatus() chan ConnectionStatus
 	SendMessage(exchange string, routingKey string, priority uint8, payload []byte) error
 	RetryMessage(event *AMQPMessage, maxRetry int) error
 	SubscribeToMessages(queue string, consumer string, autoAck bool) (<-chan AMQPMessage, error)
@@ -217,34 +217,23 @@ func (client *mqttClient) SubscribeToMessages(queue string, consumer string, aut
 	return parsedDeliveries, nil
 }
 
-func (client *mqttClient) NotifyClose() chan *amqp.Error {
-	errChan := make(chan *amqp.Error)
-
-	if client.isOperational() {
-		channel.NotifyClose(errChan)
-		connection.NotifyClose(errChan)
-	}
-
-	return errChan
+func (client *mqttClient) ListenStatus() chan ConnectionStatus {
+	return statusChannel
 }
 
 func (client *mqttClient) Disconnect() error {
-	if !channelClosed {
-		err := connection.Close()
+	err := connection.Close()
 
-		if err != nil {
-			// In debug mode, log the error
-			if client.debug {
-				client.logger.WithError(err).Info("could not close the connection")
-			}
-
-			return err
+	if err != nil {
+		// In debug mode, log the error
+		if client.debug {
+			client.logger.WithError(err).Info("could not close the connection")
 		}
 
-		return nil
+		return err
 	}
 
-	return errors.New("client connection or channel is already disconnected")
+	return channel.Close()
 }
 
 // RetryMessage will ack an incoming AMQPMessage event and redeliver it if the maxRetry
@@ -444,7 +433,7 @@ func (client *mqttClient) DeleteExchange(exchange string) error {
 }
 
 func (client *mqttClient) Ack(event AMQPMessage, multiple bool) error {
-	if _, ok := consumed[event.DeliveryTag]; ok {
+	if _, ok := consumed.Get(event.DeliveryTag); ok {
 		return errors.New("message already consumed")
 	}
 
@@ -454,13 +443,13 @@ func (client *mqttClient) Ack(event AMQPMessage, multiple bool) error {
 		return err
 	}
 
-	client.cacheConsumedMessage(event.DeliveryTag)
+	consumed.Put(event.DeliveryTag)
 
 	return nil
 }
 
 func (client *mqttClient) Nack(event AMQPMessage, multiple bool, requeue bool) error {
-	if _, ok := consumed[event.DeliveryTag]; ok {
+	if _, ok := consumed.Get(event.DeliveryTag); ok {
 		return errors.New("message already consumed")
 	}
 
@@ -470,13 +459,13 @@ func (client *mqttClient) Nack(event AMQPMessage, multiple bool, requeue bool) e
 		return err
 	}
 
-	client.cacheConsumedMessage(event.DeliveryTag)
+	consumed.Put(event.DeliveryTag)
 
 	return nil
 }
 
 func (client *mqttClient) Reject(event AMQPMessage, requeue bool) error {
-	if _, ok := consumed[event.DeliveryTag]; ok {
+	if _, ok := consumed.Get(event.DeliveryTag); ok {
 		return errors.New("message already consumed")
 	}
 
@@ -486,78 +475,7 @@ func (client *mqttClient) Reject(event AMQPMessage, requeue bool) error {
 		return err
 	}
 
-	client.cacheConsumedMessage(event.DeliveryTag)
+	consumed.Put(event.DeliveryTag)
 
 	return nil
-}
-
-func NewClient(config ClientConfig) (MQTTClient, error) {
-	client := &mqttClient{
-		Host:     config.Host,
-		Port:     config.Port,
-		Username: config.Username,
-		Password: config.Password,
-		debug:    false,
-	}
-
-	err := client.connect()
-
-	if err != nil {
-		// if maxRetry is set and greater than 0
-		// we recursively call the constructor to
-		// retry connecting
-		if config.MaxRetry > 0 {
-			config.MaxRetry -= 1
-			time.Sleep(config.RetryDelay)
-
-			// In debug mode, log the info
-			if client.debug {
-				client.logger.Info("retrying to connect to MQTT server")
-			}
-
-			return NewClient(config)
-		}
-		return nil, err
-	}
-
-	consumed = make(map[uint64]time.Time)
-	go client.launchCacheCleanup()
-
-	return client, nil
-}
-
-func NewClientDebug(config ClientConfig, logger *logrus.Logger) (MQTTClient, error) {
-	client := &mqttClient{
-		Host:     config.Host,
-		Port:     config.Port,
-		Username: config.Username,
-		Password: config.Password,
-		debug:    true,
-		logger:   logger,
-	}
-
-	err := client.connect()
-
-	if err != nil {
-		// if maxRetry is set and greater than 0
-		// we recursively call the constructor to
-		// retry connecting
-		if config.MaxRetry > 0 {
-			config.MaxRetry -= 1
-			time.Sleep(config.RetryDelay)
-
-			// In debug mode, log the info
-			if client.debug {
-				logger.Info("retrying to connect to MQTT server")
-			}
-
-			return NewClientDebug(config, logger)
-		}
-		return nil, err
-	}
-
-	consumed = make(map[uint64]time.Time)
-	go client.launchCacheCleanup()
-
-	return client, nil
 }

@@ -29,6 +29,30 @@ func (client *mqttClient) connect() error {
 
 	connection = conn
 
+	go func() {
+		for {
+			_, ok := <-conn.NotifyClose(make(chan *amqp.Error))
+
+			statusChannel <- ConnDown
+
+			if !ok {
+				break
+			}
+
+			for {
+				// wait 1s for reconnect
+				time.Sleep(time.Second)
+
+				conn, err = amqp.Dial(dialUrl)
+				if err == nil {
+					connection = conn
+					statusChannel <- ConnUp
+					break
+				}
+			}
+		}
+	}()
+
 	ch, err := conn.Channel()
 
 	if err != nil {
@@ -53,6 +77,31 @@ func (client *mqttClient) connect() error {
 
 	channel = ch
 
+	go func() {
+		for {
+			_, ok := <-ch.NotifyClose(make(chan *amqp.Error))
+
+			statusChannel <- ChanDown
+
+			if !ok {
+				channel.Close()
+				break
+			}
+
+			for {
+				// wait 1s for connection reconnect
+				time.Sleep(time.Second)
+
+				ch, err = connection.Channel()
+				if err == nil {
+					channel = ch
+					statusChannel <- ChanUp
+					break
+				}
+			}
+		}
+	}()
+
 	// In debug mode, log the infos
 	if client.debug {
 		client.logger.Info("connection to MQTT server successful")
@@ -62,7 +111,7 @@ func (client *mqttClient) connect() error {
 }
 
 func (client *mqttClient) isOperational() bool {
-	return connection != nil && channel != nil && !connection.IsClosed() && !channelClosed
+	return connection != nil && channel != nil && !connection.IsClosed()
 }
 
 // redeliver will resend an MQTT delivery from an acknowledged event
@@ -114,11 +163,6 @@ func (client *mqttClient) redeliver(event *AMQPMessage) error {
 	return err
 }
 
-func (client *mqttClient) cacheConsumedMessage(tag uint64) {
-	now := time.Now()
-	consumed[tag] = now
-}
-
 // declareExchange will initialize you exchange in the RabbitMQ server
 func (client *mqttClient) declareExchange(config ExchangeConfig) error {
 	err := channel.ExchangeDeclare(
@@ -163,54 +207,4 @@ func (client *mqttClient) addQueueBinding(queue string, routingKey string, excha
 	)
 
 	return err
-}
-
-func (client *mqttClient) launchCacheCleanup() {
-	time.Sleep(cacheTimeout / 2)
-
-	if client.debug {
-		client.logger.WithField("cacheSize", len(consumed)).Info("checking cache")
-	}
-
-	if len(consumed) == 0 {
-		if client.debug {
-			client.logger.Info("cache is empty, skipping cleanup")
-		}
-		go client.launchCacheCleanup()
-		return
-	}
-
-	now := time.Now()
-
-	for k, v := range consumed {
-		if now.Sub(v) >= cacheTimeout {
-			if client.debug {
-				client.logger.WithField("deliveryTag", k).Info("cached message expired, removing from cache")
-			}
-			delete(consumed, k)
-		}
-	}
-
-	if cacheSize := len(consumed); cacheSize >= cacheLimit {
-		if client.debug {
-			client.logger.WithField("cacheSize", cacheSize).Info("cached messages exceeded cache limit, emptying 50% of cached")
-		}
-
-		emptyCount := cacheLimit/2 + (cacheSize - cacheLimit)
-		emptied := 0
-
-		for k, _ := range consumed {
-			delete(consumed, k)
-			emptied++
-
-			if emptied >= emptyCount {
-				if client.debug {
-					client.logger.WithField("cacheSize", cacheSize).Info("emptied 50% of cached messages")
-				}
-				break
-			}
-		}
-	}
-
-	go client.launchCacheCleanup()
 }
