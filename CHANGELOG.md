@@ -1,3 +1,29 @@
+# 1.4.0
+* Reverted changes in the `RetryMessage` method signature in v1.3.0
+* Reverted changes done for handling connection close in v1.2.0
+
+Solidified connection and channel management, as well as message ack, nack and reject management:
+* Added a custom TTL cache for consumed messages to deal with ack, nack and reject of already consumed messages
+* Added new `ConnnectionStatus` type
+* Added new `ListenStatus` method that returns a stream of `ConnectionStatus`
+* Added custom `Ack`, `Nack` and `Reject` custom method to handle errors internally
+* Split client constructors, moved from `client.go` to `main.go`
+* Split client helpers, moved from `client.go` to `client_helper.go`
+* Created `TTLMap` custom type to handle a map with a TTL for each object
+
+# 1.3.0
+**BREAKING CHANGES**
+
+* Changed `RetryMessage` method signature to take a `shouldAck` flag
+* Added condition on message ack based on `shouldAck` value
+
+# 1.2.0
+**BREAKING CHANGES**
+
+Added connection close listener
+* New `NotifyClose` method to listen to connection close
+* Updated `SubscribeToMessages` method signature to take a context as argument and deal with it being done
+
 # 1.1.0
 Added support for dynamic queue, exchange et binding management
 * MQTT Client new methods:
