@@ -31,12 +31,21 @@ func (client *mqttClient) connect() error {
 
 	go func() {
 		for {
-			_, ok := <-conn.NotifyClose(make(chan *amqp.Error))
+			reason, ok := <-conn.NotifyClose(make(chan *amqp.Error))
 
 			statusChannel <- ConnDown
 
 			if !ok {
 				break
+			}
+
+			if client.debug {
+				client.logger.WithFields(LogFields{
+					"reason":  reason.Reason,
+					"code":    reason.Code,
+					"recover": reason.Recover,
+					"server":  reason.Server,
+				}).Error("connection closed")
 			}
 
 			for {
@@ -79,13 +88,22 @@ func (client *mqttClient) connect() error {
 
 	go func() {
 		for {
-			_, ok := <-ch.NotifyClose(make(chan *amqp.Error))
+			reason, ok := <-ch.NotifyClose(make(chan *amqp.Error))
 
 			statusChannel <- ChanDown
 
 			if !ok {
 				channel.Close()
 				break
+			}
+
+			if client.debug {
+				client.logger.WithFields(LogFields{
+					"reason":  reason.Reason,
+					"code":    reason.Code,
+					"recover": reason.Recover,
+					"server":  reason.Server,
+				}).Error("channel closed")
 			}
 
 			for {
