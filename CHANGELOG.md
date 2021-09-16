@@ -10,6 +10,7 @@ Solidified connection and channel management, as well as message ack, nack and r
 * Split client constructors, moved from `client.go` to `main.go`
 * Split client helpers, moved from `client.go` to `client_helper.go`
 * Created `TTLMap` custom type to handle a map with a TTL for each object
+* Enriched sent messages with a timestamp
 
 # 1.3.0
 **BREAKING CHANGES**
