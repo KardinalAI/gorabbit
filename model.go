@@ -1,6 +1,8 @@
 package gorabbit
 
 import (
+	"errors"
+	"fmt"
 	"github.com/streadway/amqp"
 	"time"
 )
@@ -66,4 +68,40 @@ func (msg *AMQPMessage) IncrementRedeliveryHeader() int {
 	msg.Headers = newHeader
 
 	return redeliveredCount
+}
+
+func (msg *AMQPMessage) Ack(multiple bool) error {
+	if _, ok := consumed.Get(msg.DeliveryTag); !ok {
+		if msg.Acknowledger != nil {
+			return msg.Acknowledger.Ack(msg.DeliveryTag, multiple)
+		} else {
+			return errors.New("delivery not initialized")
+		}
+	}
+
+	return fmt.Errorf("message %d already acknowledged", msg.DeliveryTag)
+}
+
+func (msg *AMQPMessage) Nack(multiple bool, requeue bool) error {
+	if _, ok := consumed.Get(msg.DeliveryTag); !ok {
+		if msg.Acknowledger != nil {
+			return msg.Acknowledger.Nack(msg.DeliveryTag, multiple, requeue)
+		} else {
+			return errors.New("delivery not initialized")
+		}
+	}
+
+	return fmt.Errorf("message %d already not acknowledged", msg.DeliveryTag)
+}
+
+func (msg *AMQPMessage) Reject(requeue bool) error {
+	if _, ok := consumed.Get(msg.DeliveryTag); !ok {
+		if msg.Acknowledger != nil {
+			return msg.Acknowledger.Reject(msg.DeliveryTag, requeue)
+		} else {
+			return errors.New("delivery not initialized")
+		}
+	}
+
+	return fmt.Errorf("message %d already rejected", msg.DeliveryTag)
 }
