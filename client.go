@@ -42,9 +42,6 @@ type MQTTClient interface {
 	PurgeQueue(queue string) error
 	DeleteQueue(queue string) error
 	DeleteExchange(exchange string) error
-	Ack(event AMQPMessage, multiple bool) error
-	Nack(event AMQPMessage, multiple bool, requeue bool) error
-	Reject(event AMQPMessage, requeue bool) error
 }
 
 type mqttClient struct {
@@ -239,7 +236,7 @@ func (client *mqttClient) Disconnect() error {
 // RetryMessage will ack an incoming AMQPMessage event and redeliver it if the maxRetry
 // property is not exceeded
 func (client *mqttClient) RetryMessage(event *AMQPMessage, maxRetry int) error {
-	err := client.Ack(*event, false)
+	err := event.Ack(false)
 
 	if err != nil {
 		// In debug mode, log the error
@@ -430,52 +427,4 @@ func (client *mqttClient) DeleteExchange(exchange string) error {
 	}
 
 	return channel.ExchangeDelete(exchange, false, false)
-}
-
-func (client *mqttClient) Ack(event AMQPMessage, multiple bool) error {
-	if _, ok := consumed.Get(event.DeliveryTag); ok {
-		return errors.New("message already consumed")
-	}
-
-	err := event.Ack(multiple)
-
-	if err != nil {
-		return err
-	}
-
-	consumed.Put(event.DeliveryTag)
-
-	return nil
-}
-
-func (client *mqttClient) Nack(event AMQPMessage, multiple bool, requeue bool) error {
-	if _, ok := consumed.Get(event.DeliveryTag); ok {
-		return errors.New("message already consumed")
-	}
-
-	err := event.Nack(multiple, requeue)
-
-	if err != nil {
-		return err
-	}
-
-	consumed.Put(event.DeliveryTag)
-
-	return nil
-}
-
-func (client *mqttClient) Reject(event AMQPMessage, requeue bool) error {
-	if _, ok := consumed.Get(event.DeliveryTag); ok {
-		return errors.New("message already consumed")
-	}
-
-	err := event.Reject(requeue)
-
-	if err != nil {
-		return err
-	}
-
-	consumed.Put(event.DeliveryTag)
-
-	return nil
 }

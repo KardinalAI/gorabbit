@@ -6,7 +6,7 @@ Solidified connection and channel management, as well as message ack, nack and r
 * Added a custom TTL cache for consumed messages to deal with ack, nack and reject of already consumed messages
 * Added new `ConnnectionStatus` type
 * Added new `ListenStatus` method that returns a stream of `ConnectionStatus`
-* Added custom `Ack`, `Nack` and `Reject` custom method to handle errors internally
+* Overwrote `Ack`, `Nack` and `Reject` methods on `AMQPMessage` to handle errors internally
 * Split client constructors, moved from `client.go` to `main.go`
 * Split client helpers, moved from `client.go` to `client_helper.go`
 * Created `TTLMap` custom type to handle a map with a TTL for each object
