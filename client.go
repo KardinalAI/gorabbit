@@ -112,7 +112,7 @@ func (client *mqttClient) SendMessage(exchange string, routingKey string, priori
 
 	// In debug mode, log the error
 	if err != nil && client.debug {
-		client.logger.WithError(err).Error("could not redeliver message")
+		client.logger.WithError(err).Error("could not send message")
 	}
 
 	return err
