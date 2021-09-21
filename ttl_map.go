@@ -32,20 +32,21 @@ func (m *TTLMap) Len() int {
 
 func (m *TTLMap) Put(k uint64) {
 	m.l.Lock()
+	defer m.l.Unlock()
 	_, ok := m.m[k]
 	if !ok {
 		m.m[k] = time.Now()
 	}
-	m.l.Unlock()
 }
 
 func (m *TTLMap) Get(k uint64) (v time.Time, found bool) {
 	m.l.Lock()
+	defer m.l.Unlock()
 	if it, ok := m.m[k]; ok {
 		v = it
 		found = true
+		return
 	}
 	found = false
-	m.l.Unlock()
 	return
 }
