@@ -9,27 +9,20 @@ import (
 )
 
 var (
-	// Connection manages the serialization and deserialization of incoming
-	// and outgoing frames and then dispatches them to the correct Channel
-	connection *amqp.Connection
-
-	// Channel represents the AMQP channel
-	channel *amqp.Channel
-
 	consumed *TTLMap
 
 	cacheTTL = 8 * time.Second
 
 	cacheLimit = 1024
 
-	statusChannel chan ConnectionStatus
+	reconnectDelay = time.Second
 )
 
 type LogFields = map[string]interface{}
 
 type MQTTClient interface {
 	Disconnect() error
-	ListenStatus() chan ConnectionStatus
+	ListenStatus() <-chan ConnectionStatus
 	SendMessage(exchange string, routingKey string, priority uint8, payload []byte) error
 	RetryMessage(event *AMQPMessage, maxRetry int) error
 	SubscribeToMessages(queue string, consumer string, autoAck bool) (<-chan AMQPMessage, error)
@@ -62,6 +55,16 @@ type mqttClient struct {
 
 	// logger used only in debug mode
 	logger *logrus.Logger
+
+	// connection manages the serialization and deserialization of incoming
+	// and outgoing frames and then dispatches them to the correct Channel
+	connection *amqp.Connection
+
+	// channel represents the AMQP channel
+	channel *amqp.Channel
+
+	// status is a stream of client status
+	status chan ConnectionStatus
 }
 
 // SendMessage will send the desired payload through the selected channel
@@ -92,7 +95,7 @@ func (client *mqttClient) SendMessage(exchange string, routingKey string, priori
 
 	// Publish the message via the official amqp package
 	// with our given configuration
-	err := channel.Publish(
+	err := client.channel.Publish(
 		exchange,   // exchange
 		routingKey, // routing key
 		false,      // mandatory
@@ -147,7 +150,7 @@ func (client *mqttClient) SubscribeToMessages(queue string, consumer string, aut
 
 	// Consume events via the official amqp package
 	// with our given configuration
-	messages, err := channel.Consume(
+	messages, err := client.channel.Consume(
 		queue,    // queue
 		consumer, // consumer
 		autoAck,  // auto ack
@@ -214,12 +217,12 @@ func (client *mqttClient) SubscribeToMessages(queue string, consumer string, aut
 	return parsedDeliveries, nil
 }
 
-func (client *mqttClient) ListenStatus() chan ConnectionStatus {
-	return statusChannel
+func (client *mqttClient) ListenStatus() <-chan ConnectionStatus {
+	return client.status
 }
 
 func (client *mqttClient) Disconnect() error {
-	err := connection.Close()
+	err := client.connection.Close()
 
 	if err != nil {
 		// In debug mode, log the error
@@ -230,7 +233,7 @@ func (client *mqttClient) Disconnect() error {
 		return err
 	}
 
-	return channel.Close()
+	return client.channel.Close()
 }
 
 // RetryMessage will ack an incoming AMQPMessage event and redeliver it if the maxRetry
@@ -266,7 +269,7 @@ func (client *mqttClient) RetryMessage(event *AMQPMessage, maxRetry int) error {
 		return client.redeliver(event)
 	}
 
-	return nil
+	return errors.New("max retry has been reached")
 }
 
 // CreateQueue creates a new queue programmatically event though the MQTT
@@ -322,7 +325,7 @@ func (client *mqttClient) QueueIsEmpty(config QueueConfig) (bool, error) {
 		return false, errors.New("client connection or channel is down")
 	}
 
-	q, err := channel.QueueDeclarePassive(
+	q, err := client.channel.QueueDeclarePassive(
 		config.Name,
 		config.Durable,
 		false,
@@ -345,7 +348,7 @@ func (client *mqttClient) GetNumberOfMessages(config QueueConfig) (int, error) {
 		return 0, errors.New("client connection or channel is down")
 	}
 
-	q, err := channel.QueueDeclarePassive(
+	q, err := client.channel.QueueDeclarePassive(
 		config.Name,
 		config.Durable,
 		false,
@@ -366,7 +369,7 @@ func (client *mqttClient) PopMessageFromQueue(queue string, autoAck bool) (*AMQP
 		return nil, errors.New("client connection or channel is down")
 	}
 
-	m, ok, err := channel.Get(queue, autoAck)
+	m, ok, err := client.channel.Get(queue, autoAck)
 
 	if err != nil {
 		return nil, err
@@ -394,7 +397,7 @@ func (client *mqttClient) PurgeQueue(queue string) error {
 		return errors.New("client connection or channel is down")
 	}
 
-	_, err := channel.QueuePurge(queue, false)
+	_, err := client.channel.QueuePurge(queue, false)
 
 	if err != nil {
 		return err
@@ -410,7 +413,7 @@ func (client *mqttClient) DeleteQueue(queue string) error {
 		return errors.New("client connection or channel is down")
 	}
 
-	_, err := channel.QueueDelete(queue, false, false, false)
+	_, err := client.channel.QueueDelete(queue, false, false, false)
 
 	if err != nil {
 		return err
@@ -426,5 +429,5 @@ func (client *mqttClient) DeleteExchange(exchange string) error {
 		return errors.New("client connection or channel is down")
 	}
 
-	return channel.ExchangeDelete(exchange, false, false)
+	return client.channel.ExchangeDelete(exchange, false, false)
 }

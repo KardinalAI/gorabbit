@@ -14,7 +14,7 @@ func NewClient(config ClientConfig) (MQTTClient, error) {
 		debug:    false,
 	}
 
-	statusChannel = make(chan ConnectionStatus)
+	client.status = make(chan ConnectionStatus)
 
 	err := client.connect()
 
@@ -28,6 +28,8 @@ func NewClient(config ClientConfig) (MQTTClient, error) {
 
 			return NewClient(config)
 		}
+
+		return nil, err
 	}
 
 	consumed = NewTTLMap(cacheLimit, cacheTTL)
@@ -45,7 +47,7 @@ func NewClientDebug(config ClientConfig, logger *logrus.Logger) (MQTTClient, err
 		logger:   logger,
 	}
 
-	statusChannel = make(chan ConnectionStatus)
+	client.status = make(chan ConnectionStatus)
 
 	err := client.connect()
 
@@ -64,6 +66,8 @@ func NewClientDebug(config ClientConfig, logger *logrus.Logger) (MQTTClient, err
 
 			return NewClient(config)
 		}
+
+		return nil, err
 	}
 
 	consumed = NewTTLMap(cacheLimit, cacheTTL)

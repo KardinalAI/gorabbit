@@ -27,35 +27,30 @@ func (client *mqttClient) connect() error {
 		return err
 	}
 
-	connection = conn
+	client.connection = conn
 
 	go func() {
 		for {
 			reason, ok := <-conn.NotifyClose(make(chan *amqp.Error))
 
-			statusChannel <- ConnDown
+			client.status <- ConnDown
 
 			if !ok {
 				break
 			}
 
 			if client.debug {
-				client.logger.WithFields(LogFields{
-					"reason":  reason.Reason,
-					"code":    reason.Code,
-					"recover": reason.Recover,
-					"server":  reason.Server,
-				}).Error("connection closed")
+				client.logger.WithField("notification", reason).Error("connection closed")
 			}
 
 			for {
-				// wait 1s for reconnect
-				time.Sleep(time.Second)
+				// wait reconnectDelay before trying to reconnect
+				time.Sleep(reconnectDelay)
 
 				conn, err = amqp.Dial(dialUrl)
 				if err == nil {
-					connection = conn
-					statusChannel <- ConnUp
+					client.connection = conn
+					client.status <- ConnUp
 					break
 				}
 			}
@@ -84,36 +79,31 @@ func (client *mqttClient) connect() error {
 		return err
 	}
 
-	channel = ch
+	client.channel = ch
 
 	go func() {
 		for {
 			reason, ok := <-ch.NotifyClose(make(chan *amqp.Error))
 
-			statusChannel <- ChanDown
+			client.status <- ChanDown
 
 			if !ok {
-				channel.Close()
+				client.channel.Close()
 				break
 			}
 
 			if client.debug {
-				client.logger.WithFields(LogFields{
-					"reason":  reason.Reason,
-					"code":    reason.Code,
-					"recover": reason.Recover,
-					"server":  reason.Server,
-				}).Error("channel closed")
+				client.logger.WithField("notification", reason).Error("channel closed")
 			}
 
 			for {
-				// wait 1s for connection reconnect
-				time.Sleep(time.Second)
+				// wait reconnectDelay before trying to reconnect
+				time.Sleep(reconnectDelay)
 
-				ch, err = connection.Channel()
+				ch, err = client.connection.Channel()
 				if err == nil {
-					channel = ch
-					statusChannel <- ChanUp
+					client.channel = ch
+					client.status <- ChanUp
 					break
 				}
 			}
@@ -129,7 +119,7 @@ func (client *mqttClient) connect() error {
 }
 
 func (client *mqttClient) isOperational() bool {
-	return connection != nil && channel != nil && !connection.IsClosed()
+	return client.connection != nil && client.channel != nil && !client.connection.IsClosed()
 }
 
 // redeliver will resend an MQTT delivery from an acknowledged event
@@ -158,7 +148,7 @@ func (client *mqttClient) redeliver(event *AMQPMessage) error {
 
 	// Publish the message via the official amqp package
 	// with our given configuration
-	err := channel.Publish(
+	err := client.channel.Publish(
 		event.Exchange,   // exchange
 		event.RoutingKey, // routing key
 		false,            // mandatory
@@ -183,7 +173,7 @@ func (client *mqttClient) redeliver(event *AMQPMessage) error {
 
 // declareExchange will initialize you exchange in the RabbitMQ server
 func (client *mqttClient) declareExchange(config ExchangeConfig) error {
-	err := channel.ExchangeDeclare(
+	err := client.channel.ExchangeDeclare(
 		config.Name,       // name
 		config.Type,       // type
 		config.Persisted,  // durable
@@ -198,7 +188,7 @@ func (client *mqttClient) declareExchange(config ExchangeConfig) error {
 
 // declareQueue will initialize you queue in the RabbitMQ server
 func (client *mqttClient) declareQueue(config QueueConfig) error {
-	_, err := channel.QueueDeclare(
+	_, err := client.channel.QueueDeclare(
 		config.Name,      // name
 		config.Durable,   // durable
 		false,            // delete when unused
@@ -207,16 +197,12 @@ func (client *mqttClient) declareQueue(config QueueConfig) error {
 		nil,
 	)
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // addQueueBinding will bind a queue to an exchange via a specific routing key
 func (client *mqttClient) addQueueBinding(queue string, routingKey string, exchange string) error {
-	err := channel.QueueBind(
+	err := client.channel.QueueBind(
 		queue,
 		routingKey,
 		exchange,
