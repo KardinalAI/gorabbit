@@ -1,3 +1,8 @@
+# 1.4.1
+Migration from https://github.com/streadway/amqp to https://github.com/rabbitmq/amqp091-go
+
+* Replaced `"github.com/streadway/amqp"` import to `amqp "github.com/rabbitmq/amqp091-go"` in all files
+
 # 1.4.0
 * Reverted changes in the `RetryMessage` method signature in v1.3.0
 * Reverted changes done for handling connection close in v1.2.0

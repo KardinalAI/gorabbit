@@ -3,8 +3,9 @@ package gorabbit
 import (
 	"errors"
 	"github.com/google/uuid"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/sirupsen/logrus"
-	"github.com/streadway/amqp"
+
 	"time"
 )
 
