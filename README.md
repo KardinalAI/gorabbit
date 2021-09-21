@@ -2,7 +2,7 @@
 
 Go Rabbit is a go module that offers an easy RabbitMQ client to be used in our microservices.
 
-This module depends on the official [Go RabbitMQ library](https://github.com/streadway/amqp)
+This module depends on the official [Go RabbitMQ library](https://github.com/rabbitmq/amqp091-go)
 
 ## Installation
 
