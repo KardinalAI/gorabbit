@@ -73,7 +73,12 @@ func (msg *AMQPMessage) IncrementRedeliveryHeader() int {
 func (msg *AMQPMessage) Ack(multiple bool) error {
 	if _, ok := consumed.Get(msg.DeliveryTag); !ok {
 		if msg.Acknowledger != nil {
-			return msg.Acknowledger.Ack(msg.DeliveryTag, multiple)
+			err := msg.Acknowledger.Ack(msg.DeliveryTag, multiple)
+			if err != nil {
+				return err
+			}
+			consumed.Put(msg.DeliveryTag)
+			return nil
 		} else {
 			return errors.New("delivery not initialized")
 		}
@@ -85,7 +90,12 @@ func (msg *AMQPMessage) Ack(multiple bool) error {
 func (msg *AMQPMessage) Nack(multiple bool, requeue bool) error {
 	if _, ok := consumed.Get(msg.DeliveryTag); !ok {
 		if msg.Acknowledger != nil {
-			return msg.Acknowledger.Nack(msg.DeliveryTag, multiple, requeue)
+			err := msg.Acknowledger.Nack(msg.DeliveryTag, multiple, requeue)
+			if err != nil {
+				return err
+			}
+			consumed.Put(msg.DeliveryTag)
+			return nil
 		} else {
 			return errors.New("delivery not initialized")
 		}
@@ -97,7 +107,12 @@ func (msg *AMQPMessage) Nack(multiple bool, requeue bool) error {
 func (msg *AMQPMessage) Reject(requeue bool) error {
 	if _, ok := consumed.Get(msg.DeliveryTag); !ok {
 		if msg.Acknowledger != nil {
-			return msg.Acknowledger.Reject(msg.DeliveryTag, requeue)
+			err := msg.Acknowledger.Reject(msg.DeliveryTag, requeue)
+			if err != nil {
+				return err
+			}
+			consumed.Put(msg.DeliveryTag)
+			return nil
 		} else {
 			return errors.New("delivery not initialized")
 		}
