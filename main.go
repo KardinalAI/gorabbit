@@ -32,7 +32,9 @@ func NewClient(config ClientConfig) (MQTTClient, error) {
 		return nil, err
 	}
 
-	consumed = NewTTLMap(cacheLimit, cacheTTL)
+	if consumed == nil {
+		consumed = NewTTLMap(cacheLimit, cacheTTL)
+	}
 
 	return client, nil
 }
@@ -70,7 +72,9 @@ func NewClientDebug(config ClientConfig, logger *logrus.Logger) (MQTTClient, err
 		return nil, err
 	}
 
-	consumed = NewTTLMap(cacheLimit, cacheTTL)
+	if consumed == nil {
+		consumed = NewTTLMap(cacheLimit, cacheTTL)
+	}
 
 	return client, nil
 }

@@ -10,7 +10,9 @@ import (
 
 var (
 	consumed *TTLMap
+)
 
+const (
 	cacheTTL = 8 * time.Second
 
 	cacheLimit = 1024
