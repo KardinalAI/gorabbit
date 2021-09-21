@@ -42,11 +42,6 @@ func (m *TTLMap) Put(k uint64) {
 func (m *TTLMap) Get(k uint64) (v time.Time, found bool) {
 	m.l.Lock()
 	defer m.l.Unlock()
-	if it, ok := m.m[k]; ok {
-		v = it
-		found = true
-		return
-	}
-	found = false
+	v, found = m.m[k]
 	return
 }
