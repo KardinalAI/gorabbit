@@ -19,7 +19,8 @@ func (client *mqttClient) connect() error {
 		client.logger.WithField("uri", dialUrl).Info("connecting to MQTT server")
 	}
 
-	conn, err := amqp.Dial(dialUrl)
+	var err error
+	client.connection, err = amqp.Dial(dialUrl)
 
 	if err != nil {
 		// In debug mode, log the error
@@ -32,46 +33,9 @@ func (client *mqttClient) connect() error {
 		return err
 	}
 
-	client.connection = conn
+	go client.keepConnectionAlive(dialUrl)
 
-	go func() {
-		for {
-			select {
-			case <-client.ctx.Done():
-				return
-			case reason, ok := <-conn.NotifyClose(make(chan *amqp.Error)):
-				client.status <- ConnDown
-
-				if !ok {
-					return
-				}
-
-				if client.debug {
-					client.logger.WithField("notification", reason).Error("connection closed")
-				}
-
-			Loop:
-				for {
-					select {
-					case <-client.ctx.Done():
-						return
-					default:
-						// wait reconnectDelay before trying to reconnect
-						time.Sleep(reconnectDelay)
-
-						conn, err = amqp.Dial(dialUrl)
-						if err == nil {
-							client.connection = conn
-							client.status <- ConnUp
-							break Loop
-						}
-					}
-				}
-			}
-		}
-	}()
-
-	ch, err := conn.Channel()
+	client.channel, err = client.connection.Channel()
 
 	if err != nil {
 		// In debug mode, log the error
@@ -82,7 +46,7 @@ func (client *mqttClient) connect() error {
 		return err
 	}
 
-	err = ch.Qos(10, 0, false)
+	err = client.channel.Qos(10, 0, false)
 
 	if err != nil {
 		// In debug mode, log the error
@@ -93,44 +57,7 @@ func (client *mqttClient) connect() error {
 		return err
 	}
 
-	client.channel = ch
-
-	go func() {
-		for {
-			select {
-			case <-client.ctx.Done():
-				return
-			case reason, ok := <-ch.NotifyClose(make(chan *amqp.Error)):
-				client.status <- ChanDown
-
-				if !ok {
-					return
-				}
-
-				if client.debug {
-					client.logger.WithField("notification", reason).Error("channel closed")
-				}
-
-			Loop:
-				for {
-					select {
-					case <-client.ctx.Done():
-						return
-					default:
-						// wait reconnectDelay before trying to reconnect
-						time.Sleep(reconnectDelay)
-
-						ch, err = client.connection.Channel()
-						if err == nil {
-							client.channel = ch
-							client.status <- ChanUp
-							break Loop
-						}
-					}
-				}
-			}
-		}
-	}()
+	go client.keepChannelAlive()
 
 	// In debug mode, log the infos
 	if client.debug {
@@ -138,6 +65,80 @@ func (client *mqttClient) connect() error {
 	}
 
 	return nil
+}
+
+func (client *mqttClient) keepConnectionAlive(dialUrl string) {
+	for {
+		select {
+		case <-client.ctx.Done():
+			return
+		case reason, ok := <-client.connection.NotifyClose(make(chan *amqp.Error)):
+			client.status <- ConnDown
+
+			if !ok {
+				return
+			}
+
+			if client.debug {
+				client.logger.WithField("notification", reason).Error("connection closed")
+			}
+
+		Loop:
+			for {
+				select {
+				case <-client.ctx.Done():
+					return
+				default:
+					// wait reconnectDelay before trying to reconnect
+					time.Sleep(reconnectDelay)
+
+					var err error
+					client.connection, err = amqp.Dial(dialUrl)
+					if err == nil {
+						client.status <- ConnUp
+						break Loop
+					}
+				}
+			}
+		}
+	}
+}
+
+func (client *mqttClient) keepChannelAlive() {
+	for {
+		select {
+		case <-client.ctx.Done():
+			return
+		case reason, ok := <-client.channel.NotifyClose(make(chan *amqp.Error)):
+			client.status <- ChanDown
+
+			if !ok {
+				return
+			}
+
+			if client.debug {
+				client.logger.WithField("notification", reason).Error("channel closed")
+			}
+
+		Loop:
+			for {
+				select {
+				case <-client.ctx.Done():
+					return
+				default:
+					// wait reconnectDelay before trying to reconnect
+					time.Sleep(reconnectDelay)
+
+					var err error
+					client.channel, err = client.connection.Channel()
+					if err == nil {
+						client.status <- ChanUp
+						break Loop
+					}
+				}
+			}
+		}
+	}
 }
 
 func (client *mqttClient) isOperational() bool {
