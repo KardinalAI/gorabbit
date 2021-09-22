@@ -1,6 +1,7 @@
 package gorabbit
 
 import (
+	"context"
 	"fmt"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"time"
@@ -9,6 +10,8 @@ import (
 // connect will initialize the AMQP connection, Connection and Channel
 // given a configuration
 func (client *mqttClient) connect() error {
+	client.ctx, client.cancel = context.WithCancel(context.Background())
+
 	dialUrl := fmt.Sprintf("amqp://%s:%s@%s:%d/", client.Username, client.Password, client.Host, client.Port)
 
 	// In debug mode, log the infos
@@ -24,6 +27,8 @@ func (client *mqttClient) connect() error {
 			client.logger.WithError(err).Info("could not connect to MQTT server")
 		}
 
+		client.cancel()
+
 		return err
 	}
 
@@ -31,27 +36,36 @@ func (client *mqttClient) connect() error {
 
 	go func() {
 		for {
-			reason, ok := <-conn.NotifyClose(make(chan *amqp.Error))
+			select {
+			case <-client.ctx.Done():
+				return
+			case reason, ok := <-conn.NotifyClose(make(chan *amqp.Error)):
+				client.status <- ConnDown
 
-			client.status <- ConnDown
+				if !ok {
+					return
+				}
 
-			if !ok {
-				break
-			}
+				if client.debug {
+					client.logger.WithField("notification", reason).Error("connection closed")
+				}
 
-			if client.debug {
-				client.logger.WithField("notification", reason).Error("connection closed")
-			}
+			Loop:
+				for {
+					select {
+					case <-client.ctx.Done():
+						return
+					default:
+						// wait reconnectDelay before trying to reconnect
+						time.Sleep(reconnectDelay)
 
-			for {
-				// wait reconnectDelay before trying to reconnect
-				time.Sleep(reconnectDelay)
-
-				conn, err = amqp.Dial(dialUrl)
-				if err == nil {
-					client.connection = conn
-					client.status <- ConnUp
-					break
+						conn, err = amqp.Dial(dialUrl)
+						if err == nil {
+							client.connection = conn
+							client.status <- ConnUp
+							break Loop
+						}
+					}
 				}
 			}
 		}
@@ -83,28 +97,36 @@ func (client *mqttClient) connect() error {
 
 	go func() {
 		for {
-			reason, ok := <-ch.NotifyClose(make(chan *amqp.Error))
+			select {
+			case <-client.ctx.Done():
+				return
+			case reason, ok := <-ch.NotifyClose(make(chan *amqp.Error)):
+				client.status <- ChanDown
 
-			client.status <- ChanDown
+				if !ok {
+					return
+				}
 
-			if !ok {
-				client.channel.Close()
-				break
-			}
+				if client.debug {
+					client.logger.WithField("notification", reason).Error("channel closed")
+				}
 
-			if client.debug {
-				client.logger.WithField("notification", reason).Error("channel closed")
-			}
+			Loop:
+				for {
+					select {
+					case <-client.ctx.Done():
+						return
+					default:
+						// wait reconnectDelay before trying to reconnect
+						time.Sleep(reconnectDelay)
 
-			for {
-				// wait reconnectDelay before trying to reconnect
-				time.Sleep(reconnectDelay)
-
-				ch, err = client.connection.Channel()
-				if err == nil {
-					client.channel = ch
-					client.status <- ChanUp
-					break
+						ch, err = client.connection.Channel()
+						if err == nil {
+							client.channel = ch
+							client.status <- ChanUp
+							break Loop
+						}
+					}
 				}
 			}
 		}

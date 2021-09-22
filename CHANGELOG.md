@@ -2,6 +2,8 @@
 Migration from https://github.com/streadway/amqp to https://github.com/rabbitmq/amqp091-go
 
 * Replaced `"github.com/streadway/amqp"` import to `amqp "github.com/rabbitmq/amqp091-go"` in all files
+* Fixed `Disconnect` error caused by channel being already closed
+* Introduced context management to stop the auto-reconnect process on client manual disconnect
 
 # 1.4.0
 * Reverted changes in the `RetryMessage` method signature in v1.3.0

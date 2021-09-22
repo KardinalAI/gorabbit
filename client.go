@@ -1,6 +1,7 @@
 package gorabbit
 
 import (
+	"context"
 	"errors"
 	"github.com/google/uuid"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -68,6 +69,10 @@ type mqttClient struct {
 
 	// status is a stream of client status
 	status chan ConnectionStatus
+
+	ctx context.Context
+
+	cancel context.CancelFunc
 }
 
 // SendMessage will send the desired payload through the selected channel
@@ -236,7 +241,9 @@ func (client *mqttClient) Disconnect() error {
 		return err
 	}
 
-	return client.channel.Close()
+	// cancel the context to stop all reconnection goroutines
+	client.cancel()
+	return nil
 }
 
 // RetryMessage will ack an incoming AMQPMessage event and redeliver it if the maxRetry
