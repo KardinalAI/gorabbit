@@ -85,13 +85,13 @@ func (client *mqttClient) keepConnectionAlive(dialUrl string) {
 
 		Loop:
 			for {
+				// wait reconnectDelay before trying to reconnect
+				time.Sleep(reconnectDelay)
+
 				select {
 				case <-client.ctx.Done():
 					return
 				default:
-					// wait reconnectDelay before trying to reconnect
-					time.Sleep(reconnectDelay)
-
 					var err error
 					client.connection, err = amqp.Dial(dialUrl)
 					if err == nil {
@@ -122,13 +122,13 @@ func (client *mqttClient) keepChannelAlive() {
 
 		Loop:
 			for {
+				// wait reconnectDelay before trying to reconnect
+				time.Sleep(reconnectDelay)
+
 				select {
 				case <-client.ctx.Done():
 					return
 				default:
-					// wait reconnectDelay before trying to reconnect
-					time.Sleep(reconnectDelay)
-
 					var err error
 					client.channel, err = client.connection.Channel()
 					if err == nil {
