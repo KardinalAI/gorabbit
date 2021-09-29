@@ -1,3 +1,9 @@
+# 1.4.2
+Small bug fixes
+
+* Modified `Ack`, `Nack` and `Reject` methods of `AMQPMessage` to return no error if already consumed
+* Modified `PopMessageFromQueue` method to cache auth acknowledged message
+
 # 1.4.1
 Migration from https://github.com/streadway/amqp to https://github.com/rabbitmq/amqp091-go
 

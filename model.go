@@ -2,7 +2,6 @@ package gorabbit
 
 import (
 	"errors"
-	"fmt"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"time"
 )
@@ -84,7 +83,8 @@ func (msg *AMQPMessage) Ack(multiple bool) error {
 		}
 	}
 
-	return fmt.Errorf("message %d already acknowledged", msg.DeliveryTag)
+	// If the message is already acknowledged then we just skip
+	return nil
 }
 
 func (msg *AMQPMessage) Nack(multiple bool, requeue bool) error {
@@ -101,7 +101,8 @@ func (msg *AMQPMessage) Nack(multiple bool, requeue bool) error {
 		}
 	}
 
-	return fmt.Errorf("message %d already not acknowledged", msg.DeliveryTag)
+	// If the message is already not acknowledged then we just skip
+	return nil
 }
 
 func (msg *AMQPMessage) Reject(requeue bool) error {
@@ -118,5 +119,6 @@ func (msg *AMQPMessage) Reject(requeue bool) error {
 		}
 	}
 
-	return fmt.Errorf("message %d already rejected", msg.DeliveryTag)
+	// If the message is already rejected then we just skip
+	return nil
 }

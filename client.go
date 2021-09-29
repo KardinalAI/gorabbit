@@ -389,6 +389,8 @@ func (client *mqttClient) PopMessageFromQueue(queue string, autoAck bool) (*AMQP
 		return nil, errors.New("queue is empty")
 	}
 
+	consumed.Put(m.DeliveryTag)
+
 	parsed, parseErr := ParseMessage(m)
 
 	if parseErr != nil {
