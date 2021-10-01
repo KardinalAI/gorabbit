@@ -1,3 +1,26 @@
+# 2.0.0
+Official V2 release of Gorabbit
+
+**WHAT'S NEW**
+* Introduced a connection manager to handle `amqp.Connection` and `amqp.Channel` management
+* Better reconnection and keep alive logic on channel or connection closed
+* New `ReadyCheck` method that check if everything is up and running
+* New Logging interface
+
+**WHAT'S CHANGED**
+* Everything is now handled by `connectionManager`
+* `connectionManager` overwrites amqp channel methods to check for connection status first
+* Removed `logrus` dependency for logging
+* Added new Connection Status `ConnFailed` to handle failed initial connection
+* Reduced project files
+
+**BREAKING CHANGES**
+* `ClientConfig` now takes a `KeepAlive` boolean attribute instead of `MaxRetry` and `RetryDelay`
+* `NewClient` and `NewClientConfig` no longer return an error  
+* `NewClientDebug` no longer takes a `logger` parameter
+* `QueueIsEmpty` has been removed as `GetNumberOfMessages` is enough for that evaluation
+* Removed `SetupMQTT` and `SetupMQTTFromYML` methods and logic as their functionalities are fully covered by the client
+
 # 1.4.2
 Small bug fixes
 
