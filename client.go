@@ -78,7 +78,7 @@ func NewClient(config ClientConfig) MQTTClient {
 
 	dialUrl := fmt.Sprintf("amqp://%s:%s@%s:%d/", client.Username, client.Password, client.Host, client.Port)
 
-	client.connectionManager = newManager(client.ctx, dialUrl, config.KeepAlive)
+	client.connectionManager = newManager(client.ctx, dialUrl, config.KeepAlive, client.logger)
 
 	if consumed == nil {
 		consumed = newTTLMap(cacheLimit, cacheTTL)
@@ -102,7 +102,7 @@ func NewClientDebug(config ClientConfig) MQTTClient {
 
 	client.logger.Printf("Connection to MQTT server with url: %s", dialUrl)
 
-	client.connectionManager = newManager(client.ctx, dialUrl, config.KeepAlive)
+	client.connectionManager = newManager(client.ctx, dialUrl, config.KeepAlive, client.logger)
 
 	if consumed == nil {
 		consumed = newTTLMap(cacheLimit, cacheTTL)
@@ -261,7 +261,7 @@ func (client *mqttClient) CreateQueue(config QueueConfig) error {
 
 	if config.Bindings != nil {
 		for _, binding := range *config.Bindings {
-			err = client.BindExchangeToQueueViaRoutingKey(config.Name, binding.RoutingKey, binding.Exchange)
+			err = client.BindExchangeToQueueViaRoutingKey(binding.Exchange, config.Name, binding.RoutingKey)
 
 			if err != nil {
 				return err

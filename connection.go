@@ -14,22 +14,24 @@ type connectionManager struct {
 	channel          *amqp.Channel
 	connectionStatus chan ConnectionStatus
 	keepAlive        bool
+	logger           Logger
 }
 
-func newManager(ctx context.Context, uri string, keepAlive bool) *connectionManager {
+func newManager(ctx context.Context, uri string, keepAlive bool, logger Logger) *connectionManager {
 	c := &connectionManager{
 		uri:              uri,
 		ctx:              ctx,
-		connectionStatus: make(chan ConnectionStatus),
+		connectionStatus: make(chan ConnectionStatus, 5),
 		keepAlive:        keepAlive,
+		logger:           logger,
 	}
 
 	if c.keepAlive {
 		go func() {
 			for {
 				err := c.newConnection()
-
 				if err != nil {
+					c.logger.Printf("could not create new connection: %s", err.Error())
 					c.connectionStatus <- ConnFailed
 					time.Sleep(reconnectDelay)
 				} else {
@@ -39,8 +41,8 @@ func newManager(ctx context.Context, uri string, keepAlive bool) *connectionMana
 		}()
 	} else {
 		err := c.newConnection()
-
 		if err != nil {
+			c.logger.Printf("could not create new connection: %s", err.Error())
 			c.connectionStatus <- ConnFailed
 		}
 	}
@@ -88,6 +90,7 @@ func (c *connectionManager) newChannel() error {
 	err = c.channel.Qos(10, 0, false)
 
 	if err != nil {
+		c.logger.Printf("could not declare QOS with prefetch count of %d", 10)
 		return err
 	}
 
@@ -106,12 +109,23 @@ func (c *connectionManager) close() error {
 			return err
 		}
 
+		if !c.keepAlive {
+			c.connectionStatus <- ChanDown
+		}
+
 		c.channel = nil
 	}
-	err := c.connection.Close()
 
-	if err != nil {
-		return err
+	if c.connection != nil && !c.connection.IsClosed() {
+		err := c.connection.Close()
+
+		if err != nil {
+			return err
+		}
+
+		if !c.keepAlive {
+			c.connectionStatus <- ConnDown
+		}
 	}
 
 	c.connection = nil
