@@ -29,10 +29,220 @@ go env -w GONOSUMDB="gitlab.kardinal.ai/*"
 
 This module contains 4 main functionalities:
 
+* Queues, Exchangers and Bindings Configurator from Struct
+* Queues, Exchangers and Bindings Configurator from YML
 * Message Sender
 * Message Subscriber
-* Auto Reconnection Handling  
 * Failed Messages Retry Strategy
+
+### Queues, Exchangers and Bindings Configurator from Struct
+
+You can declare a new queue:
+
+```go
+queue := gorabbit.QueueConfig{
+    Name:      "my_queue",
+    Durable:   true,
+    Exclusive: false,
+    Bindings:  nil,
+}
+```
+
+* Name: The unique queue identifier
+* Durable: Determines whether a queue is persisted or deleted as soon as the service is stopped or killed
+* Exclusive: An exclusive queue is only accessible by the connection that declared it
+* Bindings: The list of bindings to be applied to that queue
+
+You can declare a new binding:
+
+```go
+binding := gorabbit.BindingConfig{
+    RoutingKey: "routing.key",
+    Exchange:   "exchange_name",
+}
+```
+
+* RoutingKey: The "route" you want to bind to the exchanger
+* Exchange: The name of the exchanger to be bound to the queue
+
+You can declare a new exchange:
+
+```go
+exchange := gorabbit.ExchangeConfig{
+    Name:      "exchange_name",
+    Type:      gorabbit.TypeTopic,
+    Persisted: true,
+}
+```
+
+* Name: The unique identifier for the exchange
+* Type: The exchange type (Topic, Direct, Fanout, Headers). Ref: https://lostechies.com/derekgreer/2012/03/28/rabbitmq-for-windows-exchange-types/
+* Persisted: Determines whether the exchange is persisted on server stop/kill/restart
+
+Finally, to run the setup after declaring all the configs, you need to connect to the RabbitMQ server and execute the
+setup. This can be simplified by simply calling the SetupMQTT function that the package provides:
+
+```go
+clientConfig := gorabbit.ClientConfig{
+    Host:     "localhost",
+    Port:     5672,
+    Username: "guest",
+    Password: "guest",
+}
+
+...
+
+serverConfig := gorabbit.RabbitServerConfig{
+    Exchanges: exchanges,
+    Queues: queues,
+}
+
+err := gorabbit.SetupMQTT(clientConfig, serverConfig)
+
+if err != nil {
+    panic(err.Error())
+}
+
+```
+
+#### Complete Example
+
+```go
+package main
+
+import (
+	"gitlab.kardinal.ai/coretech/gorabbit"
+)
+
+func main() {
+	clientConfig := gorabbit.ClientConfig{
+		Host:     "localhost",
+		Port:     5672,
+		Username: "guest",
+		Password: "guest",
+	}
+
+	payloadExchangeConfig := gorabbit.ExchangeConfig{
+		Name:      "payloads_topic",
+		Type:      "topic",
+		Persisted: true,
+	}
+
+	eventExchangeConfig := gorabbit.ExchangeConfig{
+		Name:      "events_topic",
+		Type:      "topic",
+		Persisted: true,
+	}
+
+	payloadBindings := []gorabbit.BindingConfig{
+		{
+			RoutingKey: "*.payload.#",
+			Exchange:   payloadExchangeConfig.Name,
+		},
+	}
+
+	eventBindings := []gorabbit.BindingConfig{
+		{
+			RoutingKey: "*.event.#",
+			Exchange:   eventExchangeConfig.Name,
+		},
+	}
+
+	payloadQueueConfig := gorabbit.QueueConfig{
+		Name:      "payload_queue",
+		Durable:   true,
+		Exclusive: false,
+		Bindings:  &payloadBindings,
+	}
+
+	eventQueueConfig := gorabbit.QueueConfig{
+		Name:      "event_queue",
+		Durable:   true,
+		Exclusive: false,
+		Bindings:  &eventBindings,
+	}
+
+	exchanges := []gorabbit.ExchangeConfig{payloadExchangeConfig, eventExchangeConfig}
+	queues := []gorabbit.QueueConfig{payloadQueueConfig, eventQueueConfig}
+
+	serverConfig := gorabbit.RabbitServerConfig{
+		Exchanges: exchanges,
+		Queues: queues,
+	}
+
+	err := gorabbit.SetupMQTT(clientConfig, serverConfig)
+
+	if err != nil {
+		panic(err.Error())
+	}
+}
+```
+
+### Queues, Exchangers and Bindings Configurator from YML
+
+You can write the full configuration in a YML file and then parse it to set up your
+RabbitMQ server with queues, exchanges and bindings.
+
+The following is an example YML configuration file:
+
+```yaml
+exchanges:
+  - name: "payloads_topic"
+    type: "topic"
+    persisted: true
+  - name: "events_topic"
+    type: "topic"
+    persisted: true
+
+queues:
+  - name: "payload_queue"
+    durable: true
+    exclusive: false
+    bindings:
+      - routing_key: "*.payload.#"
+        exchange: "payloads_topic"
+  - name: "event_queue"
+    durable: true
+    exclusive: false
+    bindings:
+      - routing_key: "*.event.#"
+        exchange: "events_topic"
+```
+
+Then, you simply have to declare your file name/path before passing it to the YML configurator function
+
+```go
+fileName := "./configurator.yml"
+err := gorabbit.SetupMQTTFromYML(clientConfig, fileName)
+```
+
+
+#### Complete Example
+
+```go
+package main
+
+import (
+	"gitlab.kardinal.ai/coretech/gorabbit"
+)
+
+func main() {
+	clientConfig := gorabbit.ClientConfig{
+		Host:     "localhost",
+		Port:     5672,
+		Username: "guest",
+		Password: "guest",
+	}
+
+	fileName := "./configurator.yml"
+
+	err := gorabbit.SetupMQTTFromYML(clientConfig, fileName)
+
+	if err != nil {
+		panic(err.Error())
+	}
+}
+```
 
 ## Message Sender
 
@@ -52,16 +262,28 @@ clientConfig := gorabbit.ClientConfig{
     Port:     5672,
     Username: "guest",
     Password: "guest",
-    KeepAlive: true
+    MaxRetry: 5,
+    RetryDelay: 3 * time.seconds
 }
 
-client = gorabbit.NewClient(clientConfig)
+c, err := gorabbit.NewClient(clientConfig)
+
+if err != nil {
+    panic(err.Error())
+}
+
+client = c
 ```
 
 You can also initialize a client in **Debug** mode (with logs) as follows:
 
 ```go
-client = gorabbit.NewClientDebug(clientConfig)
+logger := logrus.Logger{
+    Out:       os.Stdout,
+    Level:     logrus.DebugLevel,
+}
+
+c, err := gorabbit.NewClientDebug(clientConfig, logger)
 ```
 
 Once the client initialized, the connection and channel will be initialized but do not close at any point yet.

@@ -1,8 +1,6 @@
 image: golang:1.16-stretch
 
 test:
-  before_script:
-    - git config --global url.https://oauth2:"${GITLAB_TOKEN}"@gitlab.kardinal.ai/.insteadOf https://gitlab.kardinal.ai/
   script:
     - if [ -n "$(gofmt -l .)" ]; then gofmt -d .; exit 1; fi
     - go vet ./...
