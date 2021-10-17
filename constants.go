@@ -10,13 +10,6 @@ const (
 	ChanDown   ConnectionStatus = "chanDown"
 )
 
-type SubscriptionHealth string
-
-const (
-	HealthOK   = "ok"
-	HealthDown = "down"
-)
-
 const (
 	RedeliveryHeader = "x-redelivered-count"
 )
