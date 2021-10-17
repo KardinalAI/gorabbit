@@ -174,3 +174,22 @@ func (m *ttlMap) Get(k uint64) (v time.Time, found bool) {
 	v, found = m.m[k]
 	return
 }
+
+type SubscriptionsHealth map[string]bool
+
+func (s SubscriptionsHealth) IsHealthy() bool {
+	for _, v := range s {
+		if !v {
+			return false
+		}
+	}
+	return true
+}
+
+func (s SubscriptionsHealth) AddSubscription(queue string, err error) {
+	if err != nil {
+		s[queue] = false
+	} else {
+		s[queue] = true
+	}
+}

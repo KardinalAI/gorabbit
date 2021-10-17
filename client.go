@@ -164,6 +164,8 @@ func (client *mqttClient) SubscribeToMessages(queue string, consumer string, aut
 		nil,      // args
 	)
 
+	client.connectionManager.subscriptions.AddSubscription(queue, err)
+
 	if err != nil {
 		client.logger.Printf("could not consume rabbitMQ messages from queue %s", queue)
 
@@ -376,5 +378,5 @@ func (client *mqttClient) DeleteExchange(exchange string) error {
 // ReadyCheck returns true if the connection to MQTT server is established
 // and a channel is open.
 func (client *mqttClient) ReadyCheck() bool {
-	return client.connectionManager.isOperational()
+	return client.connectionManager.isOperational() && client.connectionManager.isHealthy()
 }

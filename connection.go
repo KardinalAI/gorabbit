@@ -14,6 +14,7 @@ type connectionManager struct {
 	channel          *amqp.Channel
 	connectionStatus chan ConnectionStatus
 	keepAlive        bool
+	subscriptions    SubscriptionsHealth
 	logger           Logger
 }
 
@@ -23,6 +24,7 @@ func newManager(ctx context.Context, uri string, keepAlive bool, logger Logger) 
 		ctx:              ctx,
 		connectionStatus: make(chan ConnectionStatus, 5),
 		keepAlive:        keepAlive,
+		subscriptions:    make(SubscriptionsHealth),
 		logger:           logger,
 	}
 
@@ -151,6 +153,10 @@ func (c *connectionManager) isOperational() bool {
 	}
 
 	return true
+}
+
+func (c *connectionManager) isHealthy() bool {
+	return c.subscriptions.IsHealthy()
 }
 
 func (c *connectionManager) keepConnectionAlive() {
