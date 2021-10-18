@@ -247,7 +247,7 @@ func (c *connectionManager) Consume(queue, consumer string, autoAck, exclusive, 
 		return nil, connectionError
 	}
 
-	return c.channel.Consume(
+	messages, err := c.channel.Consume(
 		queue,
 		consumer,
 		autoAck,
@@ -256,6 +256,10 @@ func (c *connectionManager) Consume(queue, consumer string, autoAck, exclusive, 
 		noWait,
 		args,
 	)
+
+	c.subscriptions.AddSubscription(queue, err)
+
+	return messages, err
 }
 
 func (c *connectionManager) ExchangeDeclare(name, kind string, durable, autoDelete, internal, noWait bool, args amqp.Table) error {
