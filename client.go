@@ -373,8 +373,8 @@ func (client *mqttClient) DeleteExchange(exchange string) error {
 	return client.connectionManager.ExchangeDelete(exchange, false, false)
 }
 
-// ReadyCheck returns true if the connection to MQTT server is established
-// and a channel is open.
+// ReadyCheck returns true if the connection to MQTT server is established successfully, and
+// all subscriptions are healthy (running successfully)
 func (client *mqttClient) ReadyCheck() bool {
-	return client.connectionManager.isOperational()
+	return client.connectionManager.isOperational() && client.connectionManager.isHealthy()
 }

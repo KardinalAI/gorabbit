@@ -14,6 +14,7 @@ type connectionManager struct {
 	channel          *amqp.Channel
 	connectionStatus chan ConnectionStatus
 	keepAlive        bool
+	subscriptions    SubscriptionsHealth
 	logger           Logger
 }
 
@@ -23,6 +24,7 @@ func newManager(ctx context.Context, uri string, keepAlive bool, logger Logger) 
 		ctx:              ctx,
 		connectionStatus: make(chan ConnectionStatus, 5),
 		keepAlive:        keepAlive,
+		subscriptions:    make(SubscriptionsHealth),
 		logger:           logger,
 	}
 
@@ -153,6 +155,10 @@ func (c *connectionManager) isOperational() bool {
 	return true
 }
 
+func (c *connectionManager) isHealthy() bool {
+	return c.subscriptions.IsHealthy()
+}
+
 func (c *connectionManager) keepConnectionAlive() {
 	for {
 		select {
@@ -241,7 +247,7 @@ func (c *connectionManager) Consume(queue, consumer string, autoAck, exclusive, 
 		return nil, connectionError
 	}
 
-	return c.channel.Consume(
+	messages, err := c.channel.Consume(
 		queue,
 		consumer,
 		autoAck,
@@ -250,6 +256,10 @@ func (c *connectionManager) Consume(queue, consumer string, autoAck, exclusive, 
 		noWait,
 		args,
 	)
+
+	c.subscriptions.AddSubscription(queue, err)
+
+	return messages, err
 }
 
 func (c *connectionManager) ExchangeDeclare(name, kind string, durable, autoDelete, internal, noWait bool, args amqp.Table) error {
