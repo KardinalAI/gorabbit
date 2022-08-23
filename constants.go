@@ -28,12 +28,24 @@ const (
 	CommandsExchange = "commands_exchange"
 )
 
+type MessagePriority uint8
+
 // Priority Levels
 const (
-	PriorityLowest  = 1
-	PriorityVeryLow = 2
-	PriorityLow     = 3
-	PriorityMedium  = 4
-	PriorityHigh    = 5
-	PriorityHighest = 6
+	MessagePriorityLowest  MessagePriority = 1
+	MessagePriorityVeryLow MessagePriority = 2
+	MessagePriorityLow     MessagePriority = 3
+	MessagePriorityMedium  MessagePriority = 4
+	MessagePriorityHigh    MessagePriority = 5
+	MessagePriorityHighest MessagePriority = 6
+)
+
+func (m MessagePriority) Uint8() uint8 {
+	return uint8(m)
+}
+
+// Mode
+const (
+	Release = "release"
+	Debug   = "debug"
 )

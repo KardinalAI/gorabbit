@@ -1,4 +1,4 @@
-image: golang:1.16-stretch
+image: golang:1.18-stretch
 
 test:
   before_script:

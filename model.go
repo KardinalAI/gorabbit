@@ -12,6 +12,7 @@ type ClientConfig struct {
 	Port      uint
 	Username  string
 	Password  string
+	Mode      string // Mode is either release or debug (release by default)
 	KeepAlive bool
 }
 

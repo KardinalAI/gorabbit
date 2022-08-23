@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	amqp "github.com/rabbitmq/amqp091-go"
+	"os"
 	"time"
 )
 
@@ -26,7 +27,7 @@ type LogFields = map[string]interface{}
 type MQTTClient interface {
 	Disconnect() error
 	ListenStatus() <-chan ConnectionStatus
-	SendMessage(exchange string, routingKey string, priority uint8, payload []byte) error
+	SendMessage(exchange string, routingKey string, priority MessagePriority, payload []byte) error
 	RetryMessage(event *AMQPMessage, maxRetry int) error
 	SubscribeToMessages(queue string, consumer string, autoAck bool) (<-chan AMQPMessage, error)
 	CreateQueue(config QueueConfig) error
@@ -47,16 +48,16 @@ type mqttClient struct {
 	// Port is the configured RabbitMQ port, default usually is 5672
 	Port uint
 
-	// Username is the the username used when setting up RabbitMQ
+	// Username is the username used when setting up RabbitMQ
 	Username string
 
-	// Password is the the password used when setting up RabbitMQ
+	// Password is the password used when setting up RabbitMQ
 	Password string
 
 	// logger used only in debug mode
 	logger Logger
 
-	// connectionManager manages the connection and channel logic and and high-level logic
+	// connectionManager manages the connection and channel logic and high-level logic
 	// such as keep alive mechanism and health check
 	connectionManager *connectionManager
 
@@ -71,7 +72,18 @@ func NewClient(config ClientConfig) MQTTClient {
 		Port:     config.Port,
 		Username: config.Username,
 		Password: config.Password,
-		logger:   noLogger{},
+	}
+
+	mode := config.Mode
+	if mode == "" {
+		mode = os.Getenv("GORABBIT_MODE")
+	}
+
+	switch mode {
+	case Debug:
+		client.logger = &stdLogger{}
+	default:
+		client.logger = &noLogger{}
 	}
 
 	client.ctx, client.cancel = context.WithCancel(context.Background())
@@ -87,13 +99,15 @@ func NewClient(config ClientConfig) MQTTClient {
 	return client
 }
 
+// Deprecated: You should use NewClient instead and set the corresponding `Mode` property in ClientConfig
+// or `GORABBIT_MODE` environment variable.
 func NewClientDebug(config ClientConfig) MQTTClient {
 	client := &mqttClient{
 		Host:     config.Host,
 		Port:     config.Port,
 		Username: config.Username,
 		Password: config.Password,
-		logger:   stdLogger{},
+		logger:   &stdLogger{},
 	}
 
 	client.ctx, client.cancel = context.WithCancel(context.Background())
@@ -116,7 +130,7 @@ func NewClientDebug(config ClientConfig) MQTTClient {
 // routingKey is the route that the exchange will use to forward the message
 // priority is the priority level of the message (1 to 7)
 // payload is the object you want to send as a byte array
-func (client *mqttClient) SendMessage(exchange string, routingKey string, priority uint8, payload []byte) error {
+func (client *mqttClient) SendMessage(exchange string, routingKey string, priority MessagePriority, payload []byte) error {
 	// Publish the message via the official amqp package
 	// with our given configuration
 	err := client.connectionManager.Publish(
@@ -128,7 +142,7 @@ func (client *mqttClient) SendMessage(exchange string, routingKey string, priori
 			ContentType: "text/plain",
 			Body:        payload,
 			Type:        routingKey,
-			Priority:    priority,
+			Priority:    priority.Uint8(),
 			MessageId:   uuid.NewString(),
 			Headers: map[string]interface{}{
 				RedeliveryHeader: 0,
