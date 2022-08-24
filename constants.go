@@ -32,12 +32,12 @@ type MessagePriority uint8
 
 // Priority Levels
 const (
-	MessagePriorityLowest  MessagePriority = 1
-	MessagePriorityVeryLow MessagePriority = 2
-	MessagePriorityLow     MessagePriority = 3
-	MessagePriorityMedium  MessagePriority = 4
-	MessagePriorityHigh    MessagePriority = 5
-	MessagePriorityHighest MessagePriority = 6
+	PriorityLowest  MessagePriority = 1
+	PriorityVeryLow MessagePriority = 2
+	PriorityLow     MessagePriority = 3
+	PriorityMedium  MessagePriority = 4
+	PriorityHigh    MessagePriority = 5
+	PriorityHighest MessagePriority = 6
 )
 
 func (m MessagePriority) Uint8() uint8 {
