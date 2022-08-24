@@ -34,6 +34,7 @@ type BindingConfig struct {
 	Exchange   string `yaml:"exchange"`
 }
 
+// Deprecated: This is no longer used
 type RabbitServerConfig struct {
 	Exchanges []ExchangeConfig `yaml:"exchanges"`
 	Queues    []QueueConfig    `yaml:"queues"`
@@ -193,4 +194,26 @@ func (s SubscriptionsHealth) AddSubscription(queue string, err error) {
 	} else {
 		s[queue] = true
 	}
+}
+
+type MessageSendOptions struct {
+	RetryCount *uint
+}
+
+func SendOptions() *MessageSendOptions {
+	return &MessageSendOptions{}
+}
+
+func (m *MessageSendOptions) SetRetryCount(count uint) *MessageSendOptions {
+	m.RetryCount = &count
+
+	return m
+}
+
+func (m *MessageSendOptions) GetRetryCount() uint {
+	if m.RetryCount == nil {
+		return 0
+	}
+
+	return *m.RetryCount
 }

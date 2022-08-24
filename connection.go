@@ -228,18 +228,37 @@ func (c *connectionManager) keepChannelAlive() {
 	}
 }
 
-func (c *connectionManager) Publish(exchange, routingKey string, mandatory, immediate bool, msg amqp.Publishing) error {
+func (c *connectionManager) Publish(exchange, routingKey string, mandatory, immediate bool, msg amqp.Publishing, opts ...*MessageSendOptions) error {
 	if !c.isOperational() {
 		return connectionError
 	}
 
-	return c.channel.Publish(
+	err := c.channel.PublishWithContext(
+		c.ctx,
 		exchange,
 		routingKey,
 		mandatory,
 		immediate,
 		msg,
 	)
+
+	shouldRetry := opts != nil && opts[0] != nil && opts[0].GetRetryCount() > 0
+
+	if err != nil && shouldRetry {
+		go func() {
+			retryCount := opts[0].GetRetryCount()
+
+			c.logger.Printf("Trying to send message again in %d seconds", reconnectDelay)
+
+			time.Sleep(reconnectDelay)
+
+			newOpts := SendOptions().SetRetryCount(retryCount - 1)
+
+			_ = c.Publish(exchange, routingKey, mandatory, immediate, msg, newOpts)
+		}()
+	}
+
+	return err
 }
 
 func (c *connectionManager) Consume(queue, consumer string, autoAck, exclusive, noLocal, noWait bool, args amqp.Table) (<-chan amqp.Delivery, error) {
