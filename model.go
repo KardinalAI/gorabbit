@@ -195,25 +195,3 @@ func (s SubscriptionsHealth) AddSubscription(queue string, err error) {
 		s[queue] = true
 	}
 }
-
-type MessageSendOptions struct {
-	RetryCount *uint
-}
-
-func SendOptions() *MessageSendOptions {
-	return &MessageSendOptions{}
-}
-
-func (m *MessageSendOptions) SetRetryCount(count uint) *MessageSendOptions {
-	m.RetryCount = &count
-
-	return m
-}
-
-func (m *MessageSendOptions) GetRetryCount() uint {
-	if m.RetryCount == nil {
-		return 0
-	}
-
-	return *m.RetryCount
-}

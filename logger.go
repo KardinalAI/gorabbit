@@ -11,7 +11,7 @@ type Logger interface {
 	Printf(string, ...interface{})
 }
 
-const loggingPrefix = "gorabbit"
+const loggingPrefix = "Gorabbit"
 
 // stdLogger logs to stdout using go's default logger.
 type stdLogger struct{}

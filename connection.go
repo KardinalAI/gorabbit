@@ -22,7 +22,7 @@ func newManager(ctx context.Context, uri string, keepAlive bool, logger Logger) 
 	c := &connectionManager{
 		uri:              uri,
 		ctx:              ctx,
-		connectionStatus: make(chan ConnectionStatus, 5),
+		connectionStatus: make(chan ConnectionStatus),
 		keepAlive:        keepAlive,
 		subscriptions:    make(SubscriptionsHealth),
 		logger:           logger,
@@ -163,8 +163,13 @@ func (c *connectionManager) keepConnectionAlive() {
 	for {
 		select {
 		case <-c.ctx.Done():
+			c.logger.Printf("Cannot keep connection alive because the context is done")
 			return
-		case _, ok := <-c.connection.NotifyClose(make(chan *amqp.Error)):
+		case err, ok := <-c.connection.NotifyClose(make(chan *amqp.Error)):
+			if err != nil {
+				c.logger.Printf("Connection closed: %s", err.Error())
+			}
+
 			c.connectionStatus <- ConnDown
 			if !ok {
 				return
@@ -177,6 +182,7 @@ func (c *connectionManager) keepConnectionAlive() {
 
 				select {
 				case <-c.ctx.Done():
+					c.logger.Printf("Cannot keep connection alive because the context is done")
 					return
 				default:
 					var err error
@@ -193,10 +199,16 @@ func (c *connectionManager) keepConnectionAlive() {
 
 func (c *connectionManager) keepChannelAlive() {
 	for {
+		c.logger.Printf("Trying to create a new channel")
 		select {
 		case <-c.ctx.Done():
+			c.logger.Printf("Cannot keep channel alive because the context is done")
 			return
-		case _, ok := <-c.channel.NotifyClose(make(chan *amqp.Error)):
+		case err, ok := <-c.channel.NotifyClose(make(chan *amqp.Error)):
+			if err != nil {
+				c.logger.Printf("Channel closed: %s", err.Error())
+			}
+
 			c.connectionStatus <- ChanDown
 
 			if !ok {
@@ -210,9 +222,11 @@ func (c *connectionManager) keepChannelAlive() {
 
 				select {
 				case <-c.ctx.Done():
+					c.logger.Printf("Cannot keep channel alive because the context is done")
 					return
 				default:
 					if c.connection == nil || c.connection.IsClosed() {
+						c.logger.Printf("Cannot create new channel without a connection")
 						continue
 					}
 
@@ -228,12 +242,12 @@ func (c *connectionManager) keepChannelAlive() {
 	}
 }
 
-func (c *connectionManager) Publish(exchange, routingKey string, mandatory, immediate bool, msg amqp.Publishing, opts ...*MessageSendOptions) error {
+func (c *connectionManager) Publish(exchange, routingKey string, mandatory, immediate bool, msg amqp.Publishing) error {
 	if !c.isOperational() {
 		return connectionError
 	}
 
-	err := c.channel.PublishWithContext(
+	return c.channel.PublishWithContext(
 		c.ctx,
 		exchange,
 		routingKey,
@@ -241,24 +255,6 @@ func (c *connectionManager) Publish(exchange, routingKey string, mandatory, imme
 		immediate,
 		msg,
 	)
-
-	shouldRetry := opts != nil && opts[0] != nil && opts[0].GetRetryCount() > 0
-
-	if err != nil && shouldRetry {
-		go func() {
-			retryCount := opts[0].GetRetryCount()
-
-			c.logger.Printf("Trying to send message again in %d seconds", reconnectDelay)
-
-			time.Sleep(reconnectDelay)
-
-			newOpts := SendOptions().SetRetryCount(retryCount - 1)
-
-			_ = c.Publish(exchange, routingKey, mandatory, immediate, msg, newOpts)
-		}()
-	}
-
-	return err
 }
 
 func (c *connectionManager) Consume(queue, consumer string, autoAck, exclusive, noLocal, noWait bool, args amqp.Table) (<-chan amqp.Delivery, error) {

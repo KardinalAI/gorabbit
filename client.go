@@ -27,7 +27,7 @@ type LogFields = map[string]interface{}
 type MQTTClient interface {
 	Disconnect() error
 	ListenStatus() <-chan ConnectionStatus
-	SendMessage(exchange string, routingKey string, priority MessagePriority, payload []byte, opts ...*MessageSendOptions) error
+	SendMessage(exchange string, routingKey string, priority MessagePriority, payload []byte) error
 	RetryMessage(event *AMQPMessage, maxRetry int) error
 	SubscribeToMessages(queue string, consumer string, autoAck bool) (<-chan AMQPMessage, error)
 	CreateQueue(config QueueConfig) error
@@ -99,8 +99,8 @@ func NewClient(config ClientConfig) MQTTClient {
 	return client
 }
 
-// Deprecated: You should use NewClient instead and set the corresponding `Mode` property in ClientConfig
-// or `GORABBIT_MODE` environment variable.
+// Deprecated: Use NewClient instead and set the corresponding ClientConfig.Mode property
+// or "GORABBIT_MODE" environment variable.
 func NewClientDebug(config ClientConfig) MQTTClient {
 	client := &mqttClient{
 		Host:     config.Host,
@@ -130,7 +130,7 @@ func NewClientDebug(config ClientConfig) MQTTClient {
 // routingKey is the route that the exchange will use to forward the message
 // priority is the priority level of the message (1 to 7)
 // payload is the object you want to send as a byte array
-func (client *mqttClient) SendMessage(exchange string, routingKey string, priority MessagePriority, payload []byte, opts ...*MessageSendOptions) error {
+func (client *mqttClient) SendMessage(exchange string, routingKey string, priority MessagePriority, payload []byte) error {
 	// Publish the message via the official amqp package
 	// with our given configuration
 	err := client.connectionManager.Publish(
@@ -149,7 +149,6 @@ func (client *mqttClient) SendMessage(exchange string, routingKey string, priori
 			},
 			Timestamp: time.Now(),
 		},
-		opts...,
 	)
 
 	// log the error
