@@ -1,3 +1,20 @@
+# 2.2.0
+
+**WHAT'S NEW**
+* Added extra logs for debugging
+* Introduced new `MessagePriority` type
+* Added new property `Mode` in `ClientConfig` to control `debug` or `release` modes.
+  The mode can also alternatively be passed via an environment variable `GORABBIT_MODE`
+
+**WHAT'S CHANGED**
+* Updated go to 1.18
+* Deprecated `NewClientDebug` in favor of `NewClient` with `Mode`
+* Deprecated `RabbitServerConfig` struct that is no longer used
+
+**WHAT'S FIXED**
+* Re-connection sometimes not working due to the buffered channel of `ConnectionStatus` reaching a deadlock.
+* Fixed some typos in comments
+
 # 2.1.0
 * Introduced Health Check for failed subscriptions
 * Client `ReadyCheck` method returns readiness and health check

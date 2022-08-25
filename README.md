@@ -48,20 +48,22 @@ The `RetryDelay` property determines the delay between each connection retry.
 var client gorabbit.MQTTClient
 
 clientConfig := gorabbit.ClientConfig{
-    Host:     "localhost",
-    Port:     5672,
-    Username: "guest",
-    Password: "guest",
-    KeepAlive: true
+    Host:      "localhost",
+    Port:      5672,
+    Username:  "guest",
+    Password:  "guest",
+    KeepAlive: true,
+    Mode:      gorabbit.Debug,
 }
 
 client = gorabbit.NewClient(clientConfig)
 ```
 
-You can also initialize a client in **Debug** mode (with logs) as follows:
+You can also initialize a client in **Debug** mode (with logs) by setting the `Mode` property of the
+`ClientConfig` to `gorabbit.Debug` or by setting the following environment variable:
 
-```go
-client = gorabbit.NewClientDebug(clientConfig)
+```dotenv
+GORABBIT_MODE: debug
 ```
 
 Once the client initialized, the connection and channel will be initialized but do not close at any point yet.
