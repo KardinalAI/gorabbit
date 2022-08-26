@@ -8,12 +8,13 @@ import (
 )
 
 type ClientConfig struct {
-	Host      string
-	Port      uint
-	Username  string
-	Password  string
-	Mode      string // Mode is either release or debug (release by default)
-	KeepAlive bool
+	Host                      string
+	Port                      uint
+	Username                  string
+	Password                  string
+	KeepAlive                 bool
+	Mode                      string // Mode is either release or debug (release by default)
+	OnConnectionStatusChanged func(status ConnectionStatus)
 }
 
 type ExchangeConfig struct {

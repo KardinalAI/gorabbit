@@ -90,7 +90,7 @@ func NewClient(config ClientConfig) MQTTClient {
 
 	dialUrl := fmt.Sprintf("amqp://%s:%s@%s:%d/", client.Username, client.Password, client.Host, client.Port)
 
-	client.connectionManager = newManager(client.ctx, dialUrl, config.KeepAlive, client.logger)
+	client.connectionManager = newManager(client.ctx, dialUrl, config.KeepAlive, config.OnConnectionStatusChanged, client.logger)
 
 	if consumed == nil {
 		consumed = newTTLMap(cacheLimit, cacheTTL)
@@ -116,7 +116,7 @@ func NewClientDebug(config ClientConfig) MQTTClient {
 
 	client.logger.Printf("Connection to MQTT server with url: %s", dialUrl)
 
-	client.connectionManager = newManager(client.ctx, dialUrl, config.KeepAlive, client.logger)
+	client.connectionManager = newManager(client.ctx, dialUrl, config.KeepAlive, config.OnConnectionStatusChanged, client.logger)
 
 	if consumed == nil {
 		consumed = newTTLMap(cacheLimit, cacheTTL)

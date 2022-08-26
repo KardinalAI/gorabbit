@@ -8,24 +8,26 @@ import (
 )
 
 type connectionManager struct {
-	uri              string
-	ctx              context.Context
-	connection       *amqp.Connection
-	channel          *amqp.Channel
-	connectionStatus chan ConnectionStatus
-	keepAlive        bool
-	subscriptions    SubscriptionsHealth
-	logger           Logger
+	uri                       string
+	ctx                       context.Context
+	connection                *amqp.Connection
+	channel                   *amqp.Channel
+	connectionStatus          chan ConnectionStatus
+	onConnectionStatusChanged func(status ConnectionStatus)
+	keepAlive                 bool
+	subscriptions             SubscriptionsHealth
+	logger                    Logger
 }
 
-func newManager(ctx context.Context, uri string, keepAlive bool, logger Logger) *connectionManager {
+func newManager(ctx context.Context, uri string, keepAlive bool, onConnectionStatusChanged func(status ConnectionStatus), logger Logger) *connectionManager {
 	c := &connectionManager{
-		uri:              uri,
-		ctx:              ctx,
-		connectionStatus: make(chan ConnectionStatus),
-		keepAlive:        keepAlive,
-		subscriptions:    make(SubscriptionsHealth),
-		logger:           logger,
+		uri:                       uri,
+		ctx:                       ctx,
+		connectionStatus:          make(chan ConnectionStatus),
+		onConnectionStatusChanged: onConnectionStatusChanged,
+		keepAlive:                 keepAlive,
+		subscriptions:             make(SubscriptionsHealth),
+		logger:                    logger,
 	}
 
 	if c.keepAlive {
@@ -34,7 +36,7 @@ func newManager(ctx context.Context, uri string, keepAlive bool, logger Logger) 
 				err := c.newConnection()
 				if err != nil {
 					c.logger.Printf("could not create new connection: %s", err.Error())
-					c.connectionStatus <- ConnFailed
+					c.registerStatusChange(ConnFailed)
 					time.Sleep(reconnectDelay)
 				} else {
 					break
@@ -45,7 +47,7 @@ func newManager(ctx context.Context, uri string, keepAlive bool, logger Logger) 
 		err := c.newConnection()
 		if err != nil {
 			c.logger.Printf("could not create new connection: %s", err.Error())
-			c.connectionStatus <- ConnFailed
+			c.registerStatusChange(ConnFailed)
 		}
 	}
 
@@ -66,7 +68,7 @@ func (c *connectionManager) newConnection() error {
 			return err
 		}
 
-		c.connectionStatus <- ConnUp
+		c.registerStatusChange(ConnUp)
 
 		c.connection = conn
 
@@ -85,7 +87,7 @@ func (c *connectionManager) newChannel() error {
 		return err
 	}
 
-	c.connectionStatus <- ChanUp
+	c.registerStatusChange(ChanUp)
 
 	c.channel = ch
 
@@ -103,6 +105,14 @@ func (c *connectionManager) newChannel() error {
 	return nil
 }
 
+func (c *connectionManager) registerStatusChange(status ConnectionStatus) {
+	if c.onConnectionStatusChanged != nil {
+		c.onConnectionStatusChanged(status)
+	} else {
+		c.connectionStatus <- status
+	}
+}
+
 func (c *connectionManager) close() error {
 	if c.channel != nil && !c.channel.IsClosed() {
 		err := c.channel.Close()
@@ -112,7 +122,7 @@ func (c *connectionManager) close() error {
 		}
 
 		if !c.keepAlive {
-			c.connectionStatus <- ChanDown
+			c.registerStatusChange(ChanDown)
 		}
 
 		c.channel = nil
@@ -126,7 +136,7 @@ func (c *connectionManager) close() error {
 		}
 
 		if !c.keepAlive {
-			c.connectionStatus <- ConnDown
+			c.registerStatusChange(ConnDown)
 		}
 	}
 
@@ -170,7 +180,8 @@ func (c *connectionManager) keepConnectionAlive() {
 				c.logger.Printf("Connection closed: %s", err.Error())
 			}
 
-			c.connectionStatus <- ConnDown
+			c.registerStatusChange(ConnDown)
+
 			if !ok {
 				return
 			}
@@ -188,7 +199,7 @@ func (c *connectionManager) keepConnectionAlive() {
 					var err error
 					c.connection, err = amqp.Dial(c.uri)
 					if err == nil {
-						c.connectionStatus <- ConnUp
+						c.registerStatusChange(ConnUp)
 						break Loop
 					}
 				}
@@ -209,7 +220,7 @@ func (c *connectionManager) keepChannelAlive() {
 				c.logger.Printf("Channel closed: %s", err.Error())
 			}
 
-			c.connectionStatus <- ChanDown
+			c.registerStatusChange(ChanDown)
 
 			if !ok {
 				return
@@ -233,7 +244,7 @@ func (c *connectionManager) keepChannelAlive() {
 					var err error
 					c.channel, err = c.connection.Channel()
 					if err == nil {
-						c.connectionStatus <- ChanUp
+						c.registerStatusChange(ChanUp)
 						break Loop
 					}
 				}
