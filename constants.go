@@ -57,7 +57,7 @@ var (
 	errConnectionOrChannelClosed = errors.New("connection or channel closed")
 	errEmptyURI                  = errors.New("amqp uri is empty")
 	errDeliveryNotInitialized    = errors.New("delivery not initialized")
-	errStringParse               = errors.New("could not parse empty string")
+	errEmptyStringParse          = errors.New("could not parse empty string")
 	errInvalidFormat             = errors.New("invalid format")
 	errEmptyArgument             = errors.New("empty argument")
 	errMaxRetryReached           = errors.New("max retry has been reached")

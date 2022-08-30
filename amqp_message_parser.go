@@ -10,7 +10,7 @@ func ParseMessage(delivery amqp.Delivery) (*AMQPMessage, error) {
 	messageArgs := delivery.Type
 
 	if messageArgs == "" {
-		return nil, errStringParse
+		return nil, errEmptyStringParse
 	}
 
 	splitArgs := strings.Split(messageArgs, ".")
