@@ -312,7 +312,7 @@ func (client *mqttClient) BindExchangeToQueueViaRoutingKey(exchange, queue, rout
 	)
 }
 
-// GetNumberOfMessages returns an error if the queue doesn't exists, and the number
+// GetNumberOfMessages returns an error if the queue doesn't exist, and the number
 // of messages if it does
 func (client *mqttClient) GetNumberOfMessages(config QueueConfig) (int, error) {
 	q, err := client.connectionManager.QueueDeclarePassive(
