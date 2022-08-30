@@ -1,10 +1,10 @@
 package gorabbit
 
 import (
-	"errors"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"sync"
 	"time"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type ClientConfig struct {
@@ -35,7 +35,7 @@ type BindingConfig struct {
 	Exchange   string `yaml:"exchange"`
 }
 
-// Deprecated: This is no longer used
+// Deprecated: This is no longer used.
 type RabbitServerConfig struct {
 	Exchanges []ExchangeConfig `yaml:"exchanges"`
 	Queues    []QueueConfig    `yaml:"queues"`
@@ -73,17 +73,19 @@ func (msg *AMQPMessage) IncrementRedeliveryHeader() int {
 }
 
 func (msg *AMQPMessage) Ack(multiple bool) error {
+	if msg.Acknowledger == nil {
+		return errDeliveryNotInitialized
+	}
+
 	if _, ok := consumed.Get(msg.DeliveryTag); !ok {
-		if msg.Acknowledger != nil {
-			err := msg.Acknowledger.Ack(msg.DeliveryTag, multiple)
-			if err != nil {
-				return err
-			}
-			consumed.Put(msg.DeliveryTag)
-			return nil
-		} else {
-			return errors.New("delivery not initialized")
+		err := msg.Acknowledger.Ack(msg.DeliveryTag, multiple)
+		if err != nil {
+			return err
 		}
+
+		consumed.Put(msg.DeliveryTag)
+
+		return nil
 	}
 
 	// If the message is already acknowledged then we just skip
@@ -91,17 +93,19 @@ func (msg *AMQPMessage) Ack(multiple bool) error {
 }
 
 func (msg *AMQPMessage) Nack(multiple bool, requeue bool) error {
+	if msg.Acknowledger == nil {
+		return errDeliveryNotInitialized
+	}
+
 	if _, ok := consumed.Get(msg.DeliveryTag); !ok {
-		if msg.Acknowledger != nil {
-			err := msg.Acknowledger.Nack(msg.DeliveryTag, multiple, requeue)
-			if err != nil {
-				return err
-			}
-			consumed.Put(msg.DeliveryTag)
-			return nil
-		} else {
-			return errors.New("delivery not initialized")
+		err := msg.Acknowledger.Nack(msg.DeliveryTag, multiple, requeue)
+		if err != nil {
+			return err
 		}
+
+		consumed.Put(msg.DeliveryTag)
+
+		return nil
 	}
 
 	// If the message is already not acknowledged then we just skip
@@ -109,17 +113,19 @@ func (msg *AMQPMessage) Nack(multiple bool, requeue bool) error {
 }
 
 func (msg *AMQPMessage) Reject(requeue bool) error {
+	if msg.Acknowledger == nil {
+		return errDeliveryNotInitialized
+	}
+
 	if _, ok := consumed.Get(msg.DeliveryTag); !ok {
-		if msg.Acknowledger != nil {
-			err := msg.Acknowledger.Reject(msg.DeliveryTag, requeue)
-			if err != nil {
-				return err
-			}
-			consumed.Put(msg.DeliveryTag)
-			return nil
-		} else {
-			return errors.New("delivery not initialized")
+		err := msg.Acknowledger.Reject(msg.DeliveryTag, requeue)
+		if err != nil {
+			return err
 		}
+
+		consumed.Put(msg.DeliveryTag)
+
+		return nil
 	}
 
 	// If the message is already rejected then we just skip
@@ -142,10 +148,13 @@ type ttlMap struct {
 	l sync.Mutex
 }
 
-func newTTLMap(ln int, maxTTL time.Duration) (m *ttlMap) {
-	m = &ttlMap{m: make(map[uint64]time.Time, ln)}
+func newTTLMap(ln int, maxTTL time.Duration) *ttlMap {
+	m := &ttlMap{m: make(map[uint64]time.Time, ln)}
+
 	go func() {
-		for now := range time.Tick(maxTTL / 3) {
+		const tickFraction = 3
+
+		for now := range time.Tick(maxTTL / tickFraction) {
 			m.l.Lock()
 			for k, v := range m.m {
 				if now.Sub(v) >= maxTTL {
@@ -155,7 +164,8 @@ func newTTLMap(ln int, maxTTL time.Duration) (m *ttlMap) {
 			m.l.Unlock()
 		}
 	}()
-	return
+
+	return m
 }
 
 func (m *ttlMap) Len() int {
@@ -164,18 +174,22 @@ func (m *ttlMap) Len() int {
 
 func (m *ttlMap) Put(k uint64) {
 	m.l.Lock()
+
 	defer m.l.Unlock()
-	_, ok := m.m[k]
-	if !ok {
+
+	if _, ok := m.m[k]; !ok {
 		m.m[k] = time.Now()
 	}
 }
 
-func (m *ttlMap) Get(k uint64) (v time.Time, found bool) {
+func (m *ttlMap) Get(k uint64) (time.Time, bool) {
 	m.l.Lock()
+
 	defer m.l.Unlock()
-	v, found = m.m[k]
-	return
+
+	v, found := m.m[k]
+
+	return v, found
 }
 
 type SubscriptionsHealth map[string]bool
@@ -186,6 +200,7 @@ func (s SubscriptionsHealth) IsHealthy() bool {
 			return false
 		}
 	}
+
 	return true
 }
 

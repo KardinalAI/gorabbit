@@ -8,6 +8,7 @@
   The mode can also alternatively be passed via an environment variable `GORABBIT_MODE`
 * Added new *optional* property `OnConnectionStatusChanged` in `ClientConfig` to control the connection status
   change event synchronously.
+* Added `golangci-lint` rules and `gitlab-ci` lint test step
 
 **WHAT'S CHANGED**
 

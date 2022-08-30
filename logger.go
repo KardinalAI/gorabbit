@@ -2,6 +2,7 @@ package gorabbit
 
 import (
 	"fmt"
+
 	"gitlab.kardinal.ai/coretech/go-logging"
 )
 

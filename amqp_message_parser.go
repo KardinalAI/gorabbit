@@ -1,27 +1,29 @@
 package gorabbit
 
 import (
-	"errors"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"strings"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 func ParseMessage(delivery amqp.Delivery) (*AMQPMessage, error) {
 	messageArgs := delivery.Type
 
 	if messageArgs == "" {
-		return nil, errors.New("could not parse empty string")
+		return nil, errStringParse
 	}
 
 	splitArgs := strings.Split(messageArgs, ".")
 
-	if len(splitArgs) < 4 {
-		return nil, errors.New("invalid format")
+	const expectedArgsLength = 4
+
+	if len(splitArgs) < expectedArgsLength {
+		return nil, errInvalidFormat
 	}
 
 	for _, arg := range splitArgs {
 		if arg == "" {
-			return nil, errors.New("empty argument")
+			return nil, errEmptyArgument
 		}
 	}
 

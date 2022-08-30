@@ -1,5 +1,7 @@
 package gorabbit
 
+import "errors"
+
 type ConnectionStatus string
 
 const (
@@ -14,7 +16,7 @@ const (
 	RedeliveryHeader = "x-redelivered-count"
 )
 
-// Exchange Types
+// Exchange Types.
 const (
 	TypeTopic   = "topic"
 	TypeDirect  = "direct"
@@ -22,7 +24,7 @@ const (
 	TypeHeaders = "headers"
 )
 
-// Kardinal Specific
+// Kardinal Specific.
 const (
 	EventsExchange   = "events_exchange"
 	CommandsExchange = "commands_exchange"
@@ -30,7 +32,7 @@ const (
 
 type MessagePriority uint8
 
-// Priority Levels
+// Priority Levels.
 const (
 	PriorityLowest  MessagePriority = 1
 	PriorityVeryLow MessagePriority = 2
@@ -44,8 +46,20 @@ func (m MessagePriority) Uint8() uint8 {
 	return uint8(m)
 }
 
-// Mode
+// Mode.
 const (
 	Release = "release"
 	Debug   = "debug"
+)
+
+// Errors.
+var (
+	errConnectionOrChannelClosed = errors.New("connection or channel closed")
+	errEmptyURI                  = errors.New("amqp uri is empty")
+	errDeliveryNotInitialized    = errors.New("delivery not initialized")
+	errStringParse               = errors.New("could not parse empty string")
+	errInvalidFormat             = errors.New("invalid format")
+	errEmptyArgument             = errors.New("empty argument")
+	errMaxRetryReached           = errors.New("max retry has been reached")
+	errEmptyQueue                = errors.New("queue is empty")
 )

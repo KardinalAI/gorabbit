@@ -2,9 +2,9 @@ package gorabbit
 
 import (
 	"context"
-	"errors"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"time"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type connectionManager struct {
@@ -30,35 +30,34 @@ func newManager(ctx context.Context, uri string, keepAlive bool, onConnectionSta
 		logger:                    logger,
 	}
 
-	if c.keepAlive {
-		go func() {
-			for {
-				err := c.newConnection()
-				if err != nil {
-					c.logger.Printf("could not create new connection: %s", err.Error())
-					c.registerStatusChange(ConnFailed)
-					time.Sleep(reconnectDelay)
-				} else {
-					break
-				}
-			}
-		}()
-	} else {
-		err := c.newConnection()
-		if err != nil {
+	if !c.keepAlive {
+		if err := c.newConnection(); err != nil {
 			c.logger.Printf("could not create new connection: %s", err.Error())
 			c.registerStatusChange(ConnFailed)
 		}
+
+		return c
 	}
+
+	go func() {
+		for {
+			err := c.newConnection()
+			if err != nil {
+				c.logger.Printf("could not create new connection: %s", err.Error())
+				c.registerStatusChange(ConnFailed)
+				time.Sleep(reconnectDelay)
+			} else {
+				break
+			}
+		}
+	}()
 
 	return c
 }
 
-var connectionError = errors.New("connection or channel closed")
-
 func (c *connectionManager) newConnection() error {
 	if c.uri == "" {
-		return errors.New("amqp uri is empty")
+		return errEmptyURI
 	}
 
 	if c.connection == nil || c.connection.IsClosed() {
@@ -91,10 +90,14 @@ func (c *connectionManager) newChannel() error {
 
 	c.channel = ch
 
-	err = c.channel.Qos(10, 0, false)
+	const prefetchCount = 10
+
+	const prefetchSize = 0
+
+	err = c.channel.Qos(prefetchCount, prefetchSize, false)
 
 	if err != nil {
-		c.logger.Printf("could not declare QOS with prefetch count of %d", 10)
+		c.logger.Printf("could not declare QOS with prefetch count of %d", prefetchCount)
 		return err
 	}
 
@@ -255,7 +258,7 @@ func (c *connectionManager) keepChannelAlive() {
 
 func (c *connectionManager) Publish(exchange, routingKey string, mandatory, immediate bool, msg amqp.Publishing) error {
 	if !c.isOperational() {
-		return connectionError
+		return errConnectionOrChannelClosed
 	}
 
 	return c.channel.PublishWithContext(
@@ -270,7 +273,7 @@ func (c *connectionManager) Publish(exchange, routingKey string, mandatory, imme
 
 func (c *connectionManager) Consume(queue, consumer string, autoAck, exclusive, noLocal, noWait bool, args amqp.Table) (<-chan amqp.Delivery, error) {
 	if !c.isOperational() {
-		return nil, connectionError
+		return nil, errConnectionOrChannelClosed
 	}
 
 	messages, err := c.channel.Consume(
@@ -290,7 +293,7 @@ func (c *connectionManager) Consume(queue, consumer string, autoAck, exclusive, 
 
 func (c *connectionManager) ExchangeDeclare(name, kind string, durable, autoDelete, internal, noWait bool, args amqp.Table) error {
 	if !c.isOperational() {
-		return connectionError
+		return errConnectionOrChannelClosed
 	}
 
 	return c.channel.ExchangeDeclare(
@@ -306,7 +309,7 @@ func (c *connectionManager) ExchangeDeclare(name, kind string, durable, autoDele
 
 func (c *connectionManager) ExchangeDelete(name string, ifUnused, noWait bool) error {
 	if !c.isOperational() {
-		return connectionError
+		return errConnectionOrChannelClosed
 	}
 
 	return c.channel.ExchangeDelete(
@@ -318,7 +321,7 @@ func (c *connectionManager) ExchangeDelete(name string, ifUnused, noWait bool) e
 
 func (c *connectionManager) QueueDeclare(name string, durable, autoDelete, exclusive, noWait bool, args amqp.Table) (amqp.Queue, error) {
 	if !c.isOperational() {
-		return amqp.Queue{}, connectionError
+		return amqp.Queue{}, errConnectionOrChannelClosed
 	}
 
 	return c.channel.QueueDeclare(
@@ -333,7 +336,7 @@ func (c *connectionManager) QueueDeclare(name string, durable, autoDelete, exclu
 
 func (c *connectionManager) QueueDeclarePassive(name string, durable, autoDelete, exclusive, noWait bool, args amqp.Table) (amqp.Queue, error) {
 	if !c.isOperational() {
-		return amqp.Queue{}, connectionError
+		return amqp.Queue{}, errConnectionOrChannelClosed
 	}
 
 	return c.channel.QueueDeclarePassive(
@@ -348,7 +351,7 @@ func (c *connectionManager) QueueDeclarePassive(name string, durable, autoDelete
 
 func (c *connectionManager) QueueBind(name, key, exchange string, noWait bool, args amqp.Table) error {
 	if !c.isOperational() {
-		return connectionError
+		return errConnectionOrChannelClosed
 	}
 
 	return c.channel.QueueBind(
@@ -362,7 +365,7 @@ func (c *connectionManager) QueueBind(name, key, exchange string, noWait bool, a
 
 func (c *connectionManager) QueuePurge(name string, noWait bool) (int, error) {
 	if !c.isOperational() {
-		return 0, connectionError
+		return 0, errConnectionOrChannelClosed
 	}
 
 	return c.channel.QueuePurge(
@@ -373,7 +376,7 @@ func (c *connectionManager) QueuePurge(name string, noWait bool) (int, error) {
 
 func (c *connectionManager) QueueDelete(name string, ifUnused, ifEmpty, noWait bool) (int, error) {
 	if !c.isOperational() {
-		return 0, connectionError
+		return 0, errConnectionOrChannelClosed
 	}
 
 	return c.channel.QueueDelete(
@@ -386,7 +389,7 @@ func (c *connectionManager) QueueDelete(name string, ifUnused, ifEmpty, noWait b
 
 func (c *connectionManager) Get(queue string, autoAck bool) (amqp.Delivery, bool, error) {
 	if !c.isOperational() {
-		return amqp.Delivery{}, false, connectionError
+		return amqp.Delivery{}, false, errConnectionOrChannelClosed
 	}
 
 	return c.channel.Get(queue, autoAck)

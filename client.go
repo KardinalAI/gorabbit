@@ -2,12 +2,12 @@ package gorabbit
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"github.com/google/uuid"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"os"
 	"time"
+
+	"github.com/google/uuid"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 var (
@@ -88,9 +88,9 @@ func NewClient(config ClientConfig) MQTTClient {
 
 	client.ctx, client.cancel = context.WithCancel(context.Background())
 
-	dialUrl := fmt.Sprintf("amqp://%s:%s@%s:%d/", client.Username, client.Password, client.Host, client.Port)
+	dialURL := fmt.Sprintf("amqp://%s:%s@%s:%d/", client.Username, client.Password, client.Host, client.Port)
 
-	client.connectionManager = newManager(client.ctx, dialUrl, config.KeepAlive, config.OnConnectionStatusChanged, client.logger)
+	client.connectionManager = newManager(client.ctx, dialURL, config.KeepAlive, config.OnConnectionStatusChanged, client.logger)
 
 	if consumed == nil {
 		consumed = newTTLMap(cacheLimit, cacheTTL)
@@ -112,11 +112,11 @@ func NewClientDebug(config ClientConfig) MQTTClient {
 
 	client.ctx, client.cancel = context.WithCancel(context.Background())
 
-	dialUrl := fmt.Sprintf("amqp://%s:%s@%s:%d/", client.Username, client.Password, client.Host, client.Port)
+	dialURL := fmt.Sprintf("amqp://%s:%s@%s:%d/", client.Username, client.Password, client.Host, client.Port)
 
-	client.logger.Printf("Connection to MQTT server with url: %s", dialUrl)
+	client.logger.Printf("Connection to MQTT server with url: %s", dialURL)
 
-	client.connectionManager = newManager(client.ctx, dialUrl, config.KeepAlive, config.OnConnectionStatusChanged, client.logger)
+	client.connectionManager = newManager(client.ctx, dialURL, config.KeepAlive, config.OnConnectionStatusChanged, client.logger)
 
 	if consumed == nil {
 		consumed = newTTLMap(cacheLimit, cacheTTL)
@@ -129,7 +129,7 @@ func NewClientDebug(config ClientConfig) MQTTClient {
 // exchange is the name of the exchange targeted for event publishing
 // routingKey is the route that the exchange will use to forward the message
 // priority is the priority level of the message (1 to 7)
-// payload is the object you want to send as a byte array
+// payload is the object you want to send as a byte array.
 func (client *mqttClient) SendMessage(exchange string, routingKey string, priority MessagePriority, payload []byte) error {
 	// Publish the message via the official amqp package
 	// with our given configuration
@@ -164,7 +164,7 @@ func (client *mqttClient) SendMessage(exchange string, routingKey string, priori
 // queue is the name of the queue to connect to
 // consumer[optional] is the unique identifier of the consumer. Leaving it empty will generate a unique identifier
 // if autoAck is set to true, received events will be auto acknowledged as soon as they are consumed (received)
-// returns an incoming channel of AMQPMessage (messages)
+// returns an incoming channel of AMQPMessage (messages).
 func (client *mqttClient) SubscribeToMessages(queue string, consumer string, autoAck bool) (<-chan AMQPMessage, error) {
 	// Consume events via the official amqp package
 	// with our given configuration
@@ -224,15 +224,14 @@ func (client *mqttClient) Disconnect() error {
 
 	// cancel the context to stop all reconnection goroutines
 	client.cancel()
+
 	return nil
 }
 
 // RetryMessage will ack an incoming AMQPMessage event and redeliver it if the maxRetry
-// property is not exceeded
+// property is not exceeded.
 func (client *mqttClient) RetryMessage(event *AMQPMessage, maxRetry int) error {
-	err := event.Ack(false)
-
-	if err != nil {
+	if err := event.Ack(false); err != nil {
 		client.logger.Printf("Could not acknowledge message %s", event.MessageId)
 
 		return err
@@ -254,11 +253,11 @@ func (client *mqttClient) RetryMessage(event *AMQPMessage, maxRetry int) error {
 		)
 	}
 
-	return errors.New("max retry has been reached")
+	return errMaxRetryReached
 }
 
 // CreateQueue creates a new queue programmatically event though the MQTT
-// server is already launched
+// server is already launched.
 func (client *mqttClient) CreateQueue(config QueueConfig) error {
 	_, err := client.connectionManager.QueueDeclare(
 		config.Name,      // name
@@ -287,7 +286,7 @@ func (client *mqttClient) CreateQueue(config QueueConfig) error {
 }
 
 // CreateExchange creates a new exchange programmatically event though the MQTT
-// server is already launched
+// server is already launched.
 func (client *mqttClient) CreateExchange(config ExchangeConfig) error {
 	return client.connectionManager.ExchangeDeclare(
 		config.Name,       // name
@@ -301,7 +300,7 @@ func (client *mqttClient) CreateExchange(config ExchangeConfig) error {
 }
 
 // BindExchangeToQueueViaRoutingKey binds an exchange to a queue via a given routingKey
-//programmatically event though the MQTT server is already launched
+
 func (client *mqttClient) BindExchangeToQueueViaRoutingKey(exchange, queue, routingKey string) error {
 	return client.connectionManager.QueueBind(
 		queue,
@@ -313,7 +312,7 @@ func (client *mqttClient) BindExchangeToQueueViaRoutingKey(exchange, queue, rout
 }
 
 // GetNumberOfMessages returns an error if the queue doesn't exist, and the number
-// of messages if it does
+// of messages if it does.
 func (client *mqttClient) GetNumberOfMessages(config QueueConfig) (int, error) {
 	q, err := client.connectionManager.QueueDeclarePassive(
 		config.Name,
@@ -332,7 +331,7 @@ func (client *mqttClient) GetNumberOfMessages(config QueueConfig) (int, error) {
 }
 
 // PopMessageFromQueue fetches the latest message in queue if the queue is not empty.
-// If autoAck is true, the message will automatically be acknowledged once popped
+// If autoAck is true, the message will automatically be acknowledged once popped.
 func (client *mqttClient) PopMessageFromQueue(queue string, autoAck bool) (*AMQPMessage, error) {
 	m, ok, err := client.connectionManager.Get(queue, autoAck)
 
@@ -341,7 +340,7 @@ func (client *mqttClient) PopMessageFromQueue(queue string, autoAck bool) (*AMQP
 	}
 
 	if !ok {
-		return nil, errors.New("queue is empty")
+		return nil, errEmptyQueue
 	}
 
 	consumed.Put(m.DeliveryTag)
@@ -358,7 +357,7 @@ func (client *mqttClient) PopMessageFromQueue(queue string, autoAck bool) (*AMQP
 }
 
 // PurgeQueue will empty the given queue. An error is returned if the queue
-// does not exist
+// does not exist.
 func (client *mqttClient) PurgeQueue(queue string) error {
 	_, err := client.connectionManager.QueuePurge(queue, false)
 
@@ -370,7 +369,7 @@ func (client *mqttClient) PurgeQueue(queue string) error {
 }
 
 // DeleteQueue will delete the given queue. An error is returned if the queue
-// does not exist
+// does not exist.
 func (client *mqttClient) DeleteQueue(queue string) error {
 	_, err := client.connectionManager.QueueDelete(queue, false, false, false)
 
@@ -382,13 +381,13 @@ func (client *mqttClient) DeleteQueue(queue string) error {
 }
 
 // DeleteExchange will delete the given exchange. An error is returned if the exchange
-// does not exist
+// does not exist.
 func (client *mqttClient) DeleteExchange(exchange string) error {
 	return client.connectionManager.ExchangeDelete(exchange, false, false)
 }
 
 // ReadyCheck returns true if the connection to MQTT server is established successfully, and
-// all subscriptions are healthy (running successfully)
+// all subscriptions are healthy (running successfully).
 func (client *mqttClient) ReadyCheck() bool {
 	return client.connectionManager.isOperational() && client.connectionManager.isHealthy()
 }
