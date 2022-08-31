@@ -8,26 +8,28 @@ import (
 )
 
 type connectionManager struct {
-	uri                       string
-	ctx                       context.Context
-	connection                *amqp.Connection
-	channel                   *amqp.Channel
-	connectionStatus          chan ConnectionStatus
-	onConnectionStatusChanged func(status ConnectionStatus)
-	keepAlive                 bool
-	subscriptions             SubscriptionsHealth
-	logger                    Logger
+	uri             string
+	ctx             context.Context
+	connection      *amqp.Connection
+	channel         *amqp.Channel
+	keepAlive       bool
+	retryDelay      time.Duration
+	maxRetry        uint
+	subscriptions   SubscriptionsHealth
+	statusListeners *ClientListeners
+	logger          Logger
 }
 
-func newManager(ctx context.Context, uri string, keepAlive bool, onConnectionStatusChanged func(status ConnectionStatus), logger Logger) *connectionManager {
+func newManager(ctx context.Context, uri string, keepAlive bool, retryDelay time.Duration, maxRetry uint, statusListeners *ClientListeners, logger Logger) *connectionManager {
 	c := &connectionManager{
-		uri:                       uri,
-		ctx:                       ctx,
-		connectionStatus:          make(chan ConnectionStatus),
-		onConnectionStatusChanged: onConnectionStatusChanged,
-		keepAlive:                 keepAlive,
-		subscriptions:             make(SubscriptionsHealth),
-		logger:                    logger,
+		uri:             uri,
+		ctx:             ctx,
+		keepAlive:       keepAlive,
+		retryDelay:      retryDelay,
+		maxRetry:        maxRetry,
+		subscriptions:   make(SubscriptionsHealth),
+		statusListeners: statusListeners,
+		logger:          logger,
 	}
 
 	if !c.keepAlive {
@@ -45,7 +47,7 @@ func newManager(ctx context.Context, uri string, keepAlive bool, onConnectionSta
 			if err != nil {
 				c.logger.Printf("could not create new connection: %s", err.Error())
 				c.registerStatusChange(ConnFailed)
-				time.Sleep(reconnectDelay)
+				time.Sleep(retryDelay)
 			} else {
 				break
 			}
@@ -109,10 +111,31 @@ func (c *connectionManager) newChannel() error {
 }
 
 func (c *connectionManager) registerStatusChange(status ConnectionStatus) {
-	if c.onConnectionStatusChanged != nil {
-		c.onConnectionStatusChanged(status)
-	} else {
-		c.connectionStatus <- status
+	if c.statusListeners == nil {
+		return
+	}
+
+	switch status {
+	case ConnFailed:
+		if c.statusListeners.OnConnectionFailed != nil {
+			c.statusListeners.OnConnectionFailed()
+		}
+	case ConnUp:
+		if c.statusListeners.OnConnectionUp != nil {
+			c.statusListeners.OnConnectionUp()
+		}
+	case ChanUp:
+		if c.statusListeners.OnChannelUp != nil {
+			c.statusListeners.OnChannelUp()
+		}
+	case ChanDown:
+		if c.statusListeners.OnChannelDown != nil {
+			c.statusListeners.OnChannelDown()
+		}
+	case ConnDown:
+		if c.statusListeners.OnConnectionLost != nil {
+			c.statusListeners.OnConnectionLost()
+		}
 	}
 }
 
@@ -192,7 +215,7 @@ func (c *connectionManager) keepConnectionAlive() {
 		Loop:
 			for {
 				// wait reconnectDelay before trying to reconnect
-				time.Sleep(reconnectDelay)
+				time.Sleep(c.retryDelay)
 
 				select {
 				case <-c.ctx.Done():
@@ -232,7 +255,7 @@ func (c *connectionManager) keepChannelAlive() {
 		Loop:
 			for {
 				// wait reconnectDelay before trying to reconnect
-				time.Sleep(reconnectDelay)
+				time.Sleep(c.retryDelay)
 
 				select {
 				case <-c.ctx.Done():

@@ -8,13 +8,12 @@ import (
 )
 
 type ClientConfig struct {
-	Host                      string
-	Port                      uint
-	Username                  string
-	Password                  string
-	KeepAlive                 bool
-	Mode                      string // Mode is either release or debug (release by default)
-	OnConnectionStatusChanged func(status ConnectionStatus)
+	Host      string
+	Port      uint
+	Username  string
+	Password  string
+	KeepAlive bool
+	Mode      string // Mode is either release or debug (release by default)
 }
 
 type ExchangeConfig struct {
@@ -35,10 +34,41 @@ type BindingConfig struct {
 	Exchange   string `yaml:"exchange"`
 }
 
-// Deprecated: This is no longer used.
-type RabbitServerConfig struct {
-	Exchanges []ExchangeConfig `yaml:"exchanges"`
-	Queues    []QueueConfig    `yaml:"queues"`
+type sendOptions struct {
+	messagePriority *MessagePriority
+	deliveryMode    *DeliveryMode
+}
+
+func SendOptions() *sendOptions {
+	return &sendOptions{}
+}
+
+func (m *sendOptions) priority() uint8 {
+	if m.messagePriority == nil {
+		return PriorityMedium.Uint8()
+	}
+
+	return m.messagePriority.Uint8()
+}
+
+func (m *sendOptions) mode() uint8 {
+	if m.deliveryMode == nil {
+		return Persistent.Uint8()
+	}
+
+	return m.deliveryMode.Uint8()
+}
+
+func (m *sendOptions) SetPriority(priority MessagePriority) *sendOptions {
+	m.messagePriority = &priority
+
+	return m
+}
+
+func (m *sendOptions) SetMode(mode DeliveryMode) *sendOptions {
+	m.deliveryMode = &mode
+
+	return m
 }
 
 type AMQPMessage struct {

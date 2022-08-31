@@ -1,8 +1,6 @@
 package gorabbit
 
 import (
-	"fmt"
-
 	"gitlab.kardinal.ai/coretech/go-logging"
 )
 
@@ -18,7 +16,7 @@ const loggingPrefix = "Gorabbit"
 type stdLogger struct{}
 
 func (l stdLogger) Printf(format string, v ...interface{}) {
-	logging.Logger.Infof(fmt.Sprintf("%s: %s", loggingPrefix, format), v...)
+	logging.Logger.WithField("library", loggingPrefix).Infof(format, v...)
 }
 
 // noLogger does not log at all, this is the default.

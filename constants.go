@@ -46,11 +46,27 @@ func (m MessagePriority) Uint8() uint8 {
 	return uint8(m)
 }
 
-// Mode.
+type DeliveryMode uint8
+
+// Delivery Modes.
+const (
+	Transient  DeliveryMode = 1
+	Persistent DeliveryMode = 2
+)
+
+func (d DeliveryMode) Uint8() uint8 {
+	return uint8(d)
+}
+
+// Logging Modes.
 const (
 	Release = "release"
 	Debug   = "debug"
 )
+
+func isValidMode(mode string) bool {
+	return mode == Release || mode == Debug
+}
 
 // Errors.
 var (

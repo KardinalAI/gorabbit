@@ -1,7 +1,7 @@
 stages:
   - test
 
-TEST-app:
+TEST-library:
   before_script:
     - git config --global url.https://oauth2:"${GITLAB_TOKEN}"@gitlab.kardinal.ai/.insteadOf https://gitlab.kardinal.ai/
   stage: test
