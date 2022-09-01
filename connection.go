@@ -8,19 +8,41 @@ import (
 )
 
 type connectionManager struct {
-	uri             string
-	ctx             context.Context
-	connection      *amqp.Connection
-	channel         *amqp.Channel
-	keepAlive       bool
-	retryDelay      time.Duration
-	maxRetry        uint
-	subscriptions   subscriptionsHealth
+	// uri represents the connection string to the RabbitMQ server.
+	uri string
+
+	// ctx will be use as the main context for all functionalities.
+	ctx context.Context
+
+	// connection manages channels to handle operations such as message receptions and publishing.
+	connection *amqp.Connection
+
+	// channel is responsible for sending and receiving AMQPMessage as well as other low level methods.
+	channel *amqp.Channel
+
+	// keepAlive will determine whether the re-connection and retry mechanisms should be triggered.
+	keepAlive bool
+
+	// retryDelay will define the delay for the re-connection and retry mechanism.
+	retryDelay time.Duration
+
+	// maxRetry will define the number of retries when an AMQPMessage could not be processed.
+	maxRetry uint
+
+	// subscriptions manages the status of all active subscriptions.
+	subscriptions subscriptionsHealth
+
+	// publishingCache manages the caching of unpublished messages due to a connection error.
 	publishingCache publishingCache
+
+	// statusListeners holds listeners for each ConnectionStatus change.
 	statusListeners *ClientListeners
-	logger          Logger
+
+	// logger is passed from the client for debugging purposes.
+	logger Logger
 }
 
+// newManager instantiates a new connectionManager with given arguments.
 func newManager(ctx context.Context, uri string, keepAlive bool, retryDelay time.Duration, maxRetry uint, statusListeners *ClientListeners, logger Logger) *connectionManager {
 	c := &connectionManager{
 		uri:             uri,
@@ -34,6 +56,7 @@ func newManager(ctx context.Context, uri string, keepAlive bool, retryDelay time
 		logger:          logger,
 	}
 
+	// If we don't want to keep trying to connect in case a first attempt fails, we instantiate a new connection and return an error if the operation failed.
 	if !c.keepAlive {
 		if err := c.newConnection(); err != nil {
 			c.logger.Printf("could not create new connection: %s", err.Error())
@@ -43,6 +66,7 @@ func newManager(ctx context.Context, uri string, keepAlive bool, retryDelay time
 		return c
 	}
 
+	// If we want to keep trying to connect after a failure, we asynchronously keep launching a connection request until it succeeds.
 	go func() {
 		for {
 			err := c.newConnection()
@@ -60,11 +84,14 @@ func newManager(ctx context.Context, uri string, keepAlive bool, retryDelay time
 }
 
 func (c *connectionManager) newConnection() error {
+	// If the connection string is empty we return an error.
 	if c.uri == "" {
 		return errEmptyURI
 	}
 
+	// Only if the connection is nil or closed, should we try to connect.
 	if c.connection == nil || c.connection.IsClosed() {
+		// amqp.Dial will return a connection and an error.
 		conn, err := amqp.Dial(c.uri)
 
 		if err != nil {
@@ -75,15 +102,18 @@ func (c *connectionManager) newConnection() error {
 
 		c.connection = conn
 
+		// If the connection request was successful, and we want to keep it up in case of failure, we call an asynchronous keepAlive method.
 		if c.keepAlive {
 			go c.keepConnectionAlive()
 		}
 	}
 
+	// Finally, we return a new channel once the connection is established.
 	return c.newChannel()
 }
 
 func (c *connectionManager) newChannel() error {
+	// We request a channel from the previously opened connection.
 	ch, err := c.connection.Channel()
 
 	if err != nil {
@@ -98,6 +128,7 @@ func (c *connectionManager) newChannel() error {
 
 	const prefetchSize = 0
 
+	// Calling Qos will allow the client to process the given amount of messages without the need to be acknowledged. Basically the number of message the client can process at the same time.
 	err = c.channel.Qos(prefetchCount, prefetchSize, false)
 
 	if err != nil {
@@ -105,6 +136,7 @@ func (c *connectionManager) newChannel() error {
 		return err
 	}
 
+	// If the channel request was successful, and we want to keep it up in case of failure, we call an asynchronous keepAlive method.
 	if c.keepAlive {
 		go c.keepChannelAlive()
 	}
@@ -112,6 +144,8 @@ func (c *connectionManager) newChannel() error {
 	return nil
 }
 
+// registerStatusChange will trigger an action on ConnectionStatus change.
+// Every ConnectionStatus has its own optional listener, that is triggered only if declared.
 func (c *connectionManager) registerStatusChange(status ConnectionStatus) {
 	if c.statusListeners == nil {
 		return
@@ -138,10 +172,16 @@ func (c *connectionManager) registerStatusChange(status ConnectionStatus) {
 		if c.statusListeners.OnConnectionLost != nil {
 			c.statusListeners.OnConnectionLost()
 		}
+	case ConnClosed:
+		if c.statusListeners.OnConnectionClosed != nil {
+			c.statusListeners.OnConnectionClosed()
+		}
 	}
 }
 
+// close offers the basic connection and channel close() mechanism but with extra higher level checks.
 func (c *connectionManager) close() error {
+	// We only close a channel if it exists and is not already closed.
 	if c.channel != nil && !c.channel.IsClosed() {
 		err := c.channel.Close()
 
@@ -156,6 +196,7 @@ func (c *connectionManager) close() error {
 		c.channel = nil
 	}
 
+	// We only close a connection after child channel was closed, the connection exists and is not already closed.
 	if c.connection != nil && !c.connection.IsClosed() {
 		err := c.connection.Close()
 
@@ -170,9 +211,13 @@ func (c *connectionManager) close() error {
 
 	c.connection = nil
 
+	c.registerStatusChange(ConnClosed)
+
 	return nil
 }
 
+// isOperational returns true if the connection and channel are up and running.
+// Returns false if either the connection or channel is closed or non-existent.
 func (c *connectionManager) isOperational() bool {
 	if c.connection == nil {
 		return false
@@ -193,10 +238,14 @@ func (c *connectionManager) isOperational() bool {
 	return true
 }
 
+// isHealthy return true if all registered subscriptions succeeded.
+// Returns false if one or more subscription failed.
 func (c *connectionManager) isHealthy() bool {
 	return c.subscriptions.IsHealthy()
 }
 
+// keepConnectionAlive listens to a connection close notification and tries to re-connect after waiting for a given retryDelay.
+// This mechanism runs indefinitely or until the client is closed.
 func (c *connectionManager) keepConnectionAlive() {
 	for {
 		select {
@@ -216,7 +265,7 @@ func (c *connectionManager) keepConnectionAlive() {
 
 		Loop:
 			for {
-				// wait reconnectDelay before trying to reconnect
+				// Wait reconnectDelay before trying to reconnect.
 				time.Sleep(c.retryDelay)
 
 				select {
@@ -236,6 +285,8 @@ func (c *connectionManager) keepConnectionAlive() {
 	}
 }
 
+// keepChannelAlive listens to a channel close notification and tries to request a new channel after waiting for a given retryDelay.
+// This mechanism runs indefinitely or until the client is closed.
 func (c *connectionManager) keepChannelAlive() {
 	for {
 		select {
@@ -255,7 +306,7 @@ func (c *connectionManager) keepChannelAlive() {
 
 		Loop:
 			for {
-				// wait reconnectDelay before trying to reconnect
+				// Wait reconnectDelay before trying to reconnect.
 				time.Sleep(c.retryDelay)
 
 				select {
@@ -284,13 +335,17 @@ func (c *connectionManager) keepChannelAlive() {
 	}
 }
 
+// emptyPublishingCache re-sends all cached mqttPublishing that failed due to a disconnection error, as soon as the connection is up again.
+// This method is only a safeguard and contrary to a connection and channel, doesn't run indefinitely.
 func (c *connectionManager) emptyPublishingCache() {
+	// If the cache is empty, there is nothing to send.
 	if len(c.publishingCache) == 0 {
 		return
 	}
 
 	c.logger.Printf("Emptying publishing cache...")
 
+	// For each cached mqttPublishing, re-send the message only once then remove it from cache no matter whether it succeeds or fails.
 	for k, msg := range c.publishingCache {
 		c.logger.Printf("Re-sending message ID %s", k)
 		_ = c.Publish(msg.Exchange, msg.RoutingKey, msg.Mandatory, msg.Immediate, msg.Msg, true)
@@ -301,8 +356,10 @@ func (c *connectionManager) emptyPublishingCache() {
 	c.logger.Printf("Publishing cache emptied")
 }
 
+// Publish does the same as the native amqp publish method, but with some higher level functionalities.
 func (c *connectionManager) Publish(exchange, routingKey string, mandatory, immediate bool, msg amqp.Publishing, fromCache bool) error {
 	if !c.isOperational() {
+		// If the publishing is not coming from publishingCache, we want to insert it in the publishing cache.
 		if !fromCache {
 			mqttMsg := mqttPublishing{
 				Exchange:   exchange,
@@ -328,6 +385,7 @@ func (c *connectionManager) Publish(exchange, routingKey string, mandatory, imme
 	)
 }
 
+// Consume does the same as the native amqp consume method, but checks for the connectionManager operational status first.
 func (c *connectionManager) Consume(queue, consumer string, autoAck, exclusive, noLocal, noWait bool, args amqp.Table) (<-chan amqp.Delivery, error) {
 	if !c.isOperational() {
 		return nil, errConnectionOrChannelClosed
@@ -348,6 +406,7 @@ func (c *connectionManager) Consume(queue, consumer string, autoAck, exclusive, 
 	return messages, err
 }
 
+// ExchangeDeclare does the same as the native amqp exchangeDeclare method, but checks for the connectionManager operational status first.
 func (c *connectionManager) ExchangeDeclare(name, kind string, durable, autoDelete, internal, noWait bool, args amqp.Table) error {
 	if !c.isOperational() {
 		return errConnectionOrChannelClosed
@@ -364,6 +423,7 @@ func (c *connectionManager) ExchangeDeclare(name, kind string, durable, autoDele
 	)
 }
 
+// ExchangeDelete does the same as the native amqp exchangeDelete method, but checks for the connectionManager operational status first.
 func (c *connectionManager) ExchangeDelete(name string, ifUnused, noWait bool) error {
 	if !c.isOperational() {
 		return errConnectionOrChannelClosed
@@ -376,6 +436,7 @@ func (c *connectionManager) ExchangeDelete(name string, ifUnused, noWait bool) e
 	)
 }
 
+// QueueDeclare does the same as the native amqp queueDeclare method, but checks for the connectionManager operational status first.
 func (c *connectionManager) QueueDeclare(name string, durable, autoDelete, exclusive, noWait bool, args amqp.Table) (amqp.Queue, error) {
 	if !c.isOperational() {
 		return amqp.Queue{}, errConnectionOrChannelClosed
@@ -391,6 +452,7 @@ func (c *connectionManager) QueueDeclare(name string, durable, autoDelete, exclu
 	)
 }
 
+// QueueDeclarePassive does the same as the native amqp queueDeclarePassive method, but checks for the connectionManager operational status first.
 func (c *connectionManager) QueueDeclarePassive(name string, durable, autoDelete, exclusive, noWait bool, args amqp.Table) (amqp.Queue, error) {
 	if !c.isOperational() {
 		return amqp.Queue{}, errConnectionOrChannelClosed
@@ -406,6 +468,7 @@ func (c *connectionManager) QueueDeclarePassive(name string, durable, autoDelete
 	)
 }
 
+// QueueBind does the same as the native amqp queueBind method, but checks for the connectionManager operational status first.
 func (c *connectionManager) QueueBind(name, key, exchange string, noWait bool, args amqp.Table) error {
 	if !c.isOperational() {
 		return errConnectionOrChannelClosed
@@ -420,6 +483,7 @@ func (c *connectionManager) QueueBind(name, key, exchange string, noWait bool, a
 	)
 }
 
+// QueuePurge does the same as the native amqp queuePurge method, but checks for the connectionManager operational status first.
 func (c *connectionManager) QueuePurge(name string, noWait bool) (int, error) {
 	if !c.isOperational() {
 		return 0, errConnectionOrChannelClosed
@@ -431,6 +495,7 @@ func (c *connectionManager) QueuePurge(name string, noWait bool) (int, error) {
 	)
 }
 
+// QueueDelete does the same as the native amqp queueDelete method, but checks for the connectionManager operational status first.
 func (c *connectionManager) QueueDelete(name string, ifUnused, ifEmpty, noWait bool) (int, error) {
 	if !c.isOperational() {
 		return 0, errConnectionOrChannelClosed
@@ -444,6 +509,7 @@ func (c *connectionManager) QueueDelete(name string, ifUnused, ifEmpty, noWait b
 	)
 }
 
+// Get does the same as the native amqp get method, but checks for the connectionManager operational status first.
 func (c *connectionManager) Get(queue string, autoAck bool) (amqp.Delivery, bool, error) {
 	if !c.isOperational() {
 		return amqp.Delivery{}, false, errConnectionOrChannelClosed

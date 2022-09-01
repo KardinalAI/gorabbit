@@ -1,20 +1,12 @@
 package gorabbit
 
 import (
+	"strings"
 	"sync"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
-
-type ClientConfig struct {
-	Host      string
-	Port      uint
-	Username  string
-	Password  string
-	KeepAlive bool
-	Mode      string // Mode is either release or debug (release by default)
-}
 
 type ExchangeConfig struct {
 	Name      string `yaml:"name"`
@@ -173,13 +165,45 @@ func (msg *AMQPMessage) ToPublishing() amqp.Publishing {
 	}
 }
 
-type ttlMap struct {
+// ParseMessage takes an amqp.Deliver as argument, extracts the routingKey from the Type, and parses it as a AMQPMessage.
+// This method is purely for Kardinal's needs and should be removed in the library is made public.
+func ParseMessage(delivery amqp.Delivery) (*AMQPMessage, error) {
+	messageArgs := delivery.Type
+
+	if messageArgs == "" {
+		return nil, errEmptyStringParse
+	}
+
+	splitArgs := strings.Split(messageArgs, ".")
+
+	const expectedArgsLength = 4
+
+	if len(splitArgs) < expectedArgsLength {
+		return nil, errInvalidFormat
+	}
+
+	for _, arg := range splitArgs {
+		if arg == "" {
+			return nil, errEmptyArgument
+		}
+	}
+
+	return &AMQPMessage{
+		Delivery:     delivery,
+		Type:         splitArgs[0],
+		Microservice: splitArgs[1],
+		Entity:       splitArgs[2],
+		Action:       splitArgs[3],
+	}, nil
+}
+
+type acknowledgedMap struct {
 	m map[uint64]time.Time
 	l sync.Mutex
 }
 
-func newTTLMap(ln int, maxTTL time.Duration) *ttlMap {
-	m := &ttlMap{m: make(map[uint64]time.Time, ln)}
+func newAcknowledgedTTLCache(ln int, maxTTL time.Duration) *acknowledgedMap {
+	m := &acknowledgedMap{m: make(map[uint64]time.Time, ln)}
 
 	go func() {
 		const tickFraction = 3
@@ -198,11 +222,11 @@ func newTTLMap(ln int, maxTTL time.Duration) *ttlMap {
 	return m
 }
 
-func (m *ttlMap) Len() int {
+func (m *acknowledgedMap) Len() int {
 	return len(m.m)
 }
 
-func (m *ttlMap) Put(k uint64) {
+func (m *acknowledgedMap) Put(k uint64) {
 	m.l.Lock()
 
 	defer m.l.Unlock()
@@ -212,7 +236,7 @@ func (m *ttlMap) Put(k uint64) {
 	}
 }
 
-func (m *ttlMap) Get(k uint64) (time.Time, bool) {
+func (m *acknowledgedMap) Get(k uint64) (time.Time, bool) {
 	m.l.Lock()
 
 	defer m.l.Unlock()

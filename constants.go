@@ -5,6 +5,7 @@ import "errors"
 type ConnectionStatus string
 
 const (
+	ConnClosed ConnectionStatus = "connClosed"
 	ConnFailed ConnectionStatus = "connFailed"
 	ConnUp     ConnectionStatus = "connUp"
 	ConnDown   ConnectionStatus = "connDown"

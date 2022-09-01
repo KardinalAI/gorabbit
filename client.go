@@ -10,7 +10,7 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-var consumed *ttlMap
+var consumed *acknowledgedMap
 
 const (
 	cacheTTL   = 8 * time.Second
@@ -34,7 +34,7 @@ type MQTTClient interface {
 	RetryMessage(event *AMQPMessage, maxRetry int) error
 
 	// SubscribeToMessages will connect to a queue and consume all incoming events from it.
-	// Before an event is consumed, it will be parsed via ParseMessage method and then sent back for consumption
+	// Before an event is consumed, it will be parsed via parseMessage method and then sent back for consumption
 	//  - queue is the name of the queue to connect to.
 	//  - consumer[optional] is the unique identifier of the consumer. Leaving it empty will generate a unique identifier.
 	//  - if autoAck is set to true, received events will be auto acknowledged as soon as they are consumed (received).
@@ -160,14 +160,14 @@ func NewClient(options *clientOptions, listeners ...*ClientListeners) MQTTClient
 
 	// If the consumed cache is not present, we instantiate it.
 	if consumed == nil {
-		consumed = newTTLMap(cacheLimit, cacheTTL)
+		consumed = newAcknowledgedTTLCache(cacheLimit, cacheTTL)
 	}
 
 	return client
 }
 
 func (client *mqttClient) SendMessage(exchange string, routingKey string, payload []byte, options ...*sendOptions) error {
-	// client is disabled, so we do nothing and return no error
+	// client is disabled, so we do nothing and return no error.
 	if client.disabled {
 		return nil
 	}
@@ -192,8 +192,7 @@ func (client *mqttClient) SendMessage(exchange string, routingKey string, payloa
 		publishing.DeliveryMode = opts.mode()
 	}
 
-	// Publish the message via the official amqp package
-	// with our given configuration
+	// Publish the message via the official amqp package with our given configuration.
 	err := client.connectionManager.Publish(
 		exchange,   // exchange
 		routingKey, // routing key
@@ -212,14 +211,13 @@ func (client *mqttClient) SendMessage(exchange string, routingKey string, payloa
 }
 
 func (client *mqttClient) SubscribeToMessages(queue string, consumer string, autoAck bool) (<-chan AMQPMessage, error) {
-	// client is disabled, so we do nothing and return no error
+	// client is disabled, so we do nothing and return no error.
 	if client.disabled {
 		// nolint: nilnil // We must return <nil, nil>
 		return nil, nil
 	}
 
-	// Consume events via the official amqp package
-	// with our given configuration
+	// Consume events via the official amqp package with our given configuration.
 	messages, err := client.connectionManager.Consume(
 		queue,    // queue
 		consumer, // consumer
@@ -262,7 +260,7 @@ func (client *mqttClient) SubscribeToMessages(queue string, consumer string, aut
 }
 
 func (client *mqttClient) Disconnect() error {
-	// client is disabled, so we do nothing and return no error
+	// client is disabled, so we do nothing and return no error.
 	if client.disabled {
 		return nil
 	}
@@ -275,14 +273,17 @@ func (client *mqttClient) Disconnect() error {
 		return err
 	}
 
-	// cancel the context to stop all reconnection goroutines
+	// cancel the context to stop all reconnection goroutines.
 	client.cancel()
+
+	// disable the client to avoid trying to launch new operations.
+	client.disabled = true
 
 	return nil
 }
 
 func (client *mqttClient) RetryMessage(event *AMQPMessage, maxRetry int) error {
-	// client is disabled, so we do nothing and return no error
+	// client is disabled, so we do nothing and return no error.
 	if client.disabled {
 		return nil
 	}
@@ -314,7 +315,7 @@ func (client *mqttClient) RetryMessage(event *AMQPMessage, maxRetry int) error {
 }
 
 func (client *mqttClient) CreateQueue(config QueueConfig) error {
-	// client is disabled, so we do nothing and return no error
+	// client is disabled, so we do nothing and return no error.
 	if client.disabled {
 		return nil
 	}
@@ -346,7 +347,7 @@ func (client *mqttClient) CreateQueue(config QueueConfig) error {
 }
 
 func (client *mqttClient) CreateExchange(config ExchangeConfig) error {
-	// client is disabled, so we do nothing and return no error
+	// client is disabled, so we do nothing and return no error.
 	if client.disabled {
 		return nil
 	}
@@ -363,7 +364,7 @@ func (client *mqttClient) CreateExchange(config ExchangeConfig) error {
 }
 
 func (client *mqttClient) BindExchangeToQueueViaRoutingKey(exchange, queue, routingKey string) error {
-	// client is disabled, so we do nothing and return no error
+	// client is disabled, so we do nothing and return no error.
 	if client.disabled {
 		return nil
 	}
@@ -378,7 +379,7 @@ func (client *mqttClient) BindExchangeToQueueViaRoutingKey(exchange, queue, rout
 }
 
 func (client *mqttClient) GetNumberOfMessages(config QueueConfig) (int, error) {
-	// client is disabled, so we do nothing and return no error
+	// client is disabled, so we do nothing and return no error.
 	if client.disabled {
 		return -1, nil
 	}
@@ -400,7 +401,7 @@ func (client *mqttClient) GetNumberOfMessages(config QueueConfig) (int, error) {
 }
 
 func (client *mqttClient) PopMessageFromQueue(queue string, autoAck bool) (*AMQPMessage, error) {
-	// client is disabled, so we do nothing and return no error
+	// client is disabled, so we do nothing and return no error.
 	if client.disabled {
 		// nolint: nilnil // We must return <nil, nil>
 		return nil, nil
@@ -430,7 +431,7 @@ func (client *mqttClient) PopMessageFromQueue(queue string, autoAck bool) (*AMQP
 }
 
 func (client *mqttClient) PurgeQueue(queue string) error {
-	// client is disabled, so we do nothing and return no error
+	// client is disabled, so we do nothing and return no error.
 	if client.disabled {
 		return nil
 	}
@@ -445,7 +446,7 @@ func (client *mqttClient) PurgeQueue(queue string) error {
 }
 
 func (client *mqttClient) DeleteQueue(queue string) error {
-	// client is disabled, so we do nothing and return no error
+	// client is disabled, so we do nothing and return no error.
 	if client.disabled {
 		return nil
 	}
@@ -460,7 +461,7 @@ func (client *mqttClient) DeleteQueue(queue string) error {
 }
 
 func (client *mqttClient) DeleteExchange(exchange string) error {
-	// client is disabled, so we do nothing and return no error
+	// client is disabled, so we do nothing and return no error.
 	if client.disabled {
 		return nil
 	}
@@ -469,7 +470,7 @@ func (client *mqttClient) DeleteExchange(exchange string) error {
 }
 
 func (client *mqttClient) ReadyCheck() bool {
-	// client is disabled, so we do nothing and return true
+	// client is disabled, so we do nothing and return true.
 	if client.disabled {
 		return true
 	}

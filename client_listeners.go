@@ -7,6 +7,9 @@ type ClientListeners struct {
 	// OnConnectionLost is called when ConnDown status is received (The client lost connection to the RabbitMQ server).
 	OnConnectionLost func()
 
+	// OnConnectionClosed is called when ConnClosed status is received (The client was manually disconnection from the RabbitMQ server).
+	OnConnectionClosed func()
+
 	// OnChannelDown is called when ChanDown status is received (The client lost connection to the channel).
 	OnChannelDown func()
 
@@ -28,6 +31,9 @@ func DefaultListeners() *ClientListeners {
 		},
 		OnConnectionLost: func() {
 			logger.Printf("Connection to RabbitMQ server lost")
+		},
+		OnConnectionClosed: func() {
+			logger.Printf("Client disconnected from the RabbitMQ server")
 		},
 		OnChannelDown: func() {
 			logger.Printf("Client channel is down")
