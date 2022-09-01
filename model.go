@@ -222,9 +222,9 @@ func (m *ttlMap) Get(k uint64) (time.Time, bool) {
 	return v, found
 }
 
-type SubscriptionsHealth map[string]bool
+type subscriptionsHealth map[string]bool
 
-func (s SubscriptionsHealth) IsHealthy() bool {
+func (s subscriptionsHealth) IsHealthy() bool {
 	for _, v := range s {
 		if !v {
 			return false
@@ -234,10 +234,24 @@ func (s SubscriptionsHealth) IsHealthy() bool {
 	return true
 }
 
-func (s SubscriptionsHealth) AddSubscription(queue string, err error) {
+func (s subscriptionsHealth) AddSubscription(queue string, err error) {
 	if err != nil {
 		s[queue] = false
 	} else {
 		s[queue] = true
 	}
+}
+
+type publishingCache map[string]mqttPublishing
+
+type mqttPublishing struct {
+	Exchange   string
+	RoutingKey string
+	Mandatory  bool
+	Immediate  bool
+	Msg        amqp.Publishing
+}
+
+func (m mqttPublishing) HashCode() string {
+	return m.Msg.MessageId
 }

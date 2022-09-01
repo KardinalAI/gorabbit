@@ -26,9 +26,11 @@ type MQTTClient interface {
 	//  - routingKey is the route that the exchange will use to forward the message.
 	//  - payload is the object you want to send as a byte array.
 	// Optionally you can add sendOptions for extra customization.
+	// Returns an error if the connection to the RabbitMQ server is down.
 	SendMessage(exchange string, routingKey string, payload []byte, options ...*sendOptions) error
 
-	// RetryMessage will ack an incoming AMQPMessage event and redeliver it if the maxRetry property is not exceeded.
+	// RetryMessage will acknowledge an incoming AMQPMessage event and redeliver it if the maxRetry property is not exceeded.
+	// Returns an error if the connection to the RabbitMQ server is down.
 	RetryMessage(event *AMQPMessage, maxRetry int) error
 
 	// SubscribeToMessages will connect to a queue and consume all incoming events from it.
@@ -39,17 +41,38 @@ type MQTTClient interface {
 	// returns an incoming channel of AMQPMessage (messages).
 	SubscribeToMessages(queue string, consumer string, autoAck bool) (<-chan AMQPMessage, error)
 
-	// Editor
+	// CreateQueue will create a new queue from QueueConfig.
 	CreateQueue(config QueueConfig) error
+
+	// CreateExchange will create a new exchange from ExchangeConfig.
 	CreateExchange(config ExchangeConfig) error
+
+	// BindExchangeToQueueViaRoutingKey will bind an exchange to a queue via a given routingKey.
+	// Returns an error if the connection to the RabbitMQ server is down or if the exchange or queue does not exist.
 	BindExchangeToQueueViaRoutingKey(exchange, queue, routingKey string) error
+
+	// GetNumberOfMessages retrieves the number of messages currently sitting in a given queue.
+	// Returns an error if the connection to the RabbitMQ server is down or the queue does not exist.
 	GetNumberOfMessages(config QueueConfig) (int, error)
+
+	// PopMessageFromQueue retrieves the first message of a queue. The message can then be auto-acknowledged or not.
+	// Returns an error if the connection to the RabbitMQ server is down or the queue does not exist or is empty.
 	PopMessageFromQueue(queue string, autoAck bool) (*AMQPMessage, error)
+
+	// PurgeQueue will empty a queue of all its current messages.
+	// Returns an error if the connection to the RabbitMQ server is down or the queue does not exist.
 	PurgeQueue(queue string) error
+
+	// DeleteQueue permanently deletes an existing queue.
+	// Returns an error if the connection to the RabbitMQ server is down or the queue does not exist.
 	DeleteQueue(queue string) error
+
+	// DeleteExchange permanently deletes an existing exchange.
+	// Returns an error if the connection to the RabbitMQ server is down or the exchange does not exist.
 	DeleteExchange(exchange string) error
 
-	// Health
+	// ReadyCheck returns true if the client is fully operational, connected to the RabbitMQ and have all its subscriptions up.
+	// Returns false if one of the above failed.
 	ReadyCheck() bool
 }
 
@@ -177,6 +200,7 @@ func (client *mqttClient) SendMessage(exchange string, routingKey string, payloa
 		false,      // mandatory
 		false,      // immediate
 		*publishing,
+		false,
 	)
 
 	// log the error
@@ -282,14 +306,13 @@ func (client *mqttClient) RetryMessage(event *AMQPMessage, maxRetry int) error {
 			false,
 			false,
 			event.ToPublishing(),
+			false,
 		)
 	}
 
 	return errMaxRetryReached
 }
 
-// CreateQueue creates a new queue programmatically event though the MQTT
-// server is already launched.
 func (client *mqttClient) CreateQueue(config QueueConfig) error {
 	// client is disabled, so we do nothing and return no error
 	if client.disabled {
@@ -322,8 +345,6 @@ func (client *mqttClient) CreateQueue(config QueueConfig) error {
 	return nil
 }
 
-// CreateExchange creates a new exchange programmatically event though the MQTT
-// server is already launched.
 func (client *mqttClient) CreateExchange(config ExchangeConfig) error {
 	// client is disabled, so we do nothing and return no error
 	if client.disabled {
@@ -341,8 +362,6 @@ func (client *mqttClient) CreateExchange(config ExchangeConfig) error {
 	)
 }
 
-// BindExchangeToQueueViaRoutingKey binds an exchange to a queue via a given routingKey
-
 func (client *mqttClient) BindExchangeToQueueViaRoutingKey(exchange, queue, routingKey string) error {
 	// client is disabled, so we do nothing and return no error
 	if client.disabled {
@@ -358,8 +377,6 @@ func (client *mqttClient) BindExchangeToQueueViaRoutingKey(exchange, queue, rout
 	)
 }
 
-// GetNumberOfMessages returns an error if the queue doesn't exist, and the number
-// of messages if it does.
 func (client *mqttClient) GetNumberOfMessages(config QueueConfig) (int, error) {
 	// client is disabled, so we do nothing and return no error
 	if client.disabled {
@@ -382,8 +399,6 @@ func (client *mqttClient) GetNumberOfMessages(config QueueConfig) (int, error) {
 	return q.Messages, nil
 }
 
-// PopMessageFromQueue fetches the latest message in queue if the queue is not empty.
-// If autoAck is true, the message will automatically be acknowledged once popped.
 func (client *mqttClient) PopMessageFromQueue(queue string, autoAck bool) (*AMQPMessage, error) {
 	// client is disabled, so we do nothing and return no error
 	if client.disabled {
@@ -414,8 +429,6 @@ func (client *mqttClient) PopMessageFromQueue(queue string, autoAck bool) (*AMQP
 	return parsed, nil
 }
 
-// PurgeQueue will empty the given queue. An error is returned if the queue
-// does not exist.
 func (client *mqttClient) PurgeQueue(queue string) error {
 	// client is disabled, so we do nothing and return no error
 	if client.disabled {
@@ -431,8 +444,6 @@ func (client *mqttClient) PurgeQueue(queue string) error {
 	return nil
 }
 
-// DeleteQueue will delete the given queue. An error is returned if the queue
-// does not exist.
 func (client *mqttClient) DeleteQueue(queue string) error {
 	// client is disabled, so we do nothing and return no error
 	if client.disabled {
@@ -448,8 +459,6 @@ func (client *mqttClient) DeleteQueue(queue string) error {
 	return nil
 }
 
-// DeleteExchange will delete the given exchange. An error is returned if the exchange
-// does not exist.
 func (client *mqttClient) DeleteExchange(exchange string) error {
 	// client is disabled, so we do nothing and return no error
 	if client.disabled {
@@ -459,8 +468,6 @@ func (client *mqttClient) DeleteExchange(exchange string) error {
 	return client.connectionManager.ExchangeDelete(exchange, false, false)
 }
 
-// ReadyCheck returns true if the connection to MQTT server is established successfully, and
-// all subscriptions are healthy (running successfully).
 func (client *mqttClient) ReadyCheck() bool {
 	// client is disabled, so we do nothing and return true
 	if client.disabled {

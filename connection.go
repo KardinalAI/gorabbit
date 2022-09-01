@@ -15,7 +15,8 @@ type connectionManager struct {
 	keepAlive       bool
 	retryDelay      time.Duration
 	maxRetry        uint
-	subscriptions   SubscriptionsHealth
+	subscriptions   subscriptionsHealth
+	publishingCache publishingCache
 	statusListeners *ClientListeners
 	logger          Logger
 }
@@ -27,7 +28,8 @@ func newManager(ctx context.Context, uri string, keepAlive bool, retryDelay time
 		keepAlive:       keepAlive,
 		retryDelay:      retryDelay,
 		maxRetry:        maxRetry,
-		subscriptions:   make(SubscriptionsHealth),
+		subscriptions:   make(subscriptionsHealth),
+		publishingCache: make(publishingCache),
 		statusListeners: statusListeners,
 		logger:          logger,
 	}
@@ -236,7 +238,6 @@ func (c *connectionManager) keepConnectionAlive() {
 
 func (c *connectionManager) keepChannelAlive() {
 	for {
-		c.logger.Printf("Trying to create a new channel")
 		select {
 		case <-c.ctx.Done():
 			c.logger.Printf("Cannot keep channel alive because the context is done")
@@ -267,10 +268,14 @@ func (c *connectionManager) keepChannelAlive() {
 						continue
 					}
 
+					c.logger.Printf("Trying to create a new channel")
+
 					var err error
 					c.channel, err = c.connection.Channel()
 					if err == nil {
 						c.registerStatusChange(ChanUp)
+						go c.emptyPublishingCache()
+
 						break Loop
 					}
 				}
@@ -279,8 +284,37 @@ func (c *connectionManager) keepChannelAlive() {
 	}
 }
 
-func (c *connectionManager) Publish(exchange, routingKey string, mandatory, immediate bool, msg amqp.Publishing) error {
+func (c *connectionManager) emptyPublishingCache() {
+	if len(c.publishingCache) == 0 {
+		return
+	}
+
+	c.logger.Printf("Emptying publishing cache...")
+
+	for k, msg := range c.publishingCache {
+		c.logger.Printf("Re-sending message ID %s", k)
+		_ = c.Publish(msg.Exchange, msg.RoutingKey, msg.Mandatory, msg.Immediate, msg.Msg, true)
+
+		delete(c.publishingCache, k)
+	}
+
+	c.logger.Printf("Publishing cache emptied")
+}
+
+func (c *connectionManager) Publish(exchange, routingKey string, mandatory, immediate bool, msg amqp.Publishing, fromCache bool) error {
 	if !c.isOperational() {
+		if !fromCache {
+			mqttMsg := mqttPublishing{
+				Exchange:   exchange,
+				RoutingKey: routingKey,
+				Mandatory:  mandatory,
+				Immediate:  immediate,
+				Msg:        msg,
+			}
+
+			c.publishingCache[mqttMsg.HashCode()] = mqttMsg
+		}
+
 		return errConnectionOrChannelClosed
 	}
 
