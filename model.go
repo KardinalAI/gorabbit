@@ -2,8 +2,6 @@ package gorabbit
 
 import (
 	"strings"
-	"sync"
-	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -105,7 +103,7 @@ func (msg *AMQPMessage) Ack(multiple bool) error {
 			return err
 		}
 
-		consumed.Put(msg.DeliveryTag)
+		consumed.Put(msg.DeliveryTag, nil)
 
 		return nil
 	}
@@ -125,7 +123,7 @@ func (msg *AMQPMessage) Nack(multiple bool, requeue bool) error {
 			return err
 		}
 
-		consumed.Put(msg.DeliveryTag)
+		consumed.Put(msg.DeliveryTag, nil)
 
 		return nil
 	}
@@ -145,7 +143,7 @@ func (msg *AMQPMessage) Reject(requeue bool) error {
 			return err
 		}
 
-		consumed.Put(msg.DeliveryTag)
+		consumed.Put(msg.DeliveryTag, nil)
 
 		return nil
 	}
@@ -197,55 +195,6 @@ func ParseMessage(delivery amqp.Delivery) (*AMQPMessage, error) {
 	}, nil
 }
 
-type acknowledgedMap struct {
-	m map[uint64]time.Time
-	l sync.Mutex
-}
-
-func newAcknowledgedTTLCache(ln int, maxTTL time.Duration) *acknowledgedMap {
-	m := &acknowledgedMap{m: make(map[uint64]time.Time, ln)}
-
-	go func() {
-		const tickFraction = 3
-
-		for now := range time.Tick(maxTTL / tickFraction) {
-			m.l.Lock()
-			for k, v := range m.m {
-				if now.Sub(v) >= maxTTL {
-					delete(m.m, k)
-				}
-			}
-			m.l.Unlock()
-		}
-	}()
-
-	return m
-}
-
-func (m *acknowledgedMap) Len() int {
-	return len(m.m)
-}
-
-func (m *acknowledgedMap) Put(k uint64) {
-	m.l.Lock()
-
-	defer m.l.Unlock()
-
-	if _, ok := m.m[k]; !ok {
-		m.m[k] = time.Now()
-	}
-}
-
-func (m *acknowledgedMap) Get(k uint64) (time.Time, bool) {
-	m.l.Lock()
-
-	defer m.l.Unlock()
-
-	v, found := m.m[k]
-
-	return v, found
-}
-
 type subscriptionsHealth map[string]bool
 
 func (s subscriptionsHealth) IsHealthy() bool {
@@ -265,8 +214,6 @@ func (s subscriptionsHealth) AddSubscription(queue string, err error) {
 		s[queue] = true
 	}
 }
-
-type publishingCache map[string]mqttPublishing
 
 type mqttPublishing struct {
 	Exchange   string

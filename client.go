@@ -10,11 +10,11 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-var consumed *acknowledgedMap
+var consumed *ttlMap[uint64, interface{}]
 
 const (
-	cacheTTL   = 8 * time.Second
-	cacheLimit = 1024
+	consumedCacheTTL      = 8 * time.Second
+	consumeCacheMaxLength = 1024
 )
 
 type MQTTClient interface {
@@ -160,7 +160,7 @@ func NewClient(options *clientOptions, listeners ...*ClientListeners) MQTTClient
 
 	// If the consumed cache is not present, we instantiate it.
 	if consumed == nil {
-		consumed = newAcknowledgedTTLCache(cacheLimit, cacheTTL)
+		consumed = newTTLMap[uint64, interface{}](consumeCacheMaxLength, consumedCacheTTL)
 	}
 
 	return client
@@ -417,7 +417,7 @@ func (client *mqttClient) PopMessageFromQueue(queue string, autoAck bool) (*AMQP
 		return nil, errEmptyQueue
 	}
 
-	consumed.Put(m.DeliveryTag)
+	consumed.Put(m.DeliveryTag, nil)
 
 	parsed, parseErr := ParseMessage(m)
 

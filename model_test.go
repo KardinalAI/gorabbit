@@ -5,8 +5,8 @@ import (
 
 	"gitlab.kardinal.ai/coretech/gorabbit/v2"
 
-	"github.com/go-playground/assert/v2"
 	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMessageTypeParsingSuccess(t *testing.T) {
@@ -18,7 +18,7 @@ func TestMessageTypeParsingSuccess(t *testing.T) {
 
 	parsed, err := gorabbit.ParseMessage(delivery)
 
-	assert.Equal(t, err, nil)
+	assert.Nil(t, err)
 	assert.Equal(t, parsed.Type, "event")
 	assert.Equal(t, parsed.Microservice, "solange")
 	assert.Equal(t, parsed.Entity, "solution")
@@ -34,7 +34,7 @@ func TestMessageTypeParsingFailEmptyArg(t *testing.T) {
 
 	_, err := gorabbit.ParseMessage(delivery)
 
-	assert.NotEqual(t, err, nil)
+	assert.NotNil(t, err)
 	assert.Equal(t, err.Error(), "empty argument")
 }
 
@@ -47,7 +47,7 @@ func TestMessageTypeParsingFail(t *testing.T) {
 
 	_, err := gorabbit.ParseMessage(delivery)
 
-	assert.NotEqual(t, err, nil)
+	assert.NotNil(t, err)
 	assert.Equal(t, err.Error(), "invalid format")
 }
 
@@ -60,6 +60,6 @@ func TestMessageTypeParsingEmpty(t *testing.T) {
 
 	_, err := gorabbit.ParseMessage(delivery)
 
-	assert.NotEqual(t, err, nil)
+	assert.NotNil(t, err)
 	assert.Equal(t, err.Error(), "could not parse empty string")
 }

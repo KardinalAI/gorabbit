@@ -7,6 +7,11 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+const (
+	publishingCacheTTL       = 60 * time.Second
+	publishingCacheMaxLength = 128
+)
+
 type connectionManager struct {
 	// uri represents the connection string to the RabbitMQ server.
 	uri string
@@ -33,7 +38,7 @@ type connectionManager struct {
 	subscriptions subscriptionsHealth
 
 	// publishingCache manages the caching of unpublished messages due to a connection error.
-	publishingCache publishingCache
+	publishingCache *ttlMap[string, mqttPublishing]
 
 	// statusListeners holds listeners for each ConnectionStatus change.
 	statusListeners *ClientListeners
@@ -51,7 +56,7 @@ func newManager(ctx context.Context, uri string, keepAlive bool, retryDelay time
 		retryDelay:      retryDelay,
 		maxRetry:        maxRetry,
 		subscriptions:   make(subscriptionsHealth),
-		publishingCache: make(publishingCache),
+		publishingCache: newTTLMap[string, mqttPublishing](publishingCacheMaxLength, publishingCacheTTL),
 		statusListeners: statusListeners,
 		logger:          logger,
 	}
@@ -339,19 +344,19 @@ func (c *connectionManager) keepChannelAlive() {
 // This method is only a safeguard and contrary to a connection and channel, doesn't run indefinitely.
 func (c *connectionManager) emptyPublishingCache() {
 	// If the cache is empty, there is nothing to send.
-	if len(c.publishingCache) == 0 {
+	if c.publishingCache.Len() == 0 {
 		return
 	}
 
 	c.logger.Printf("Emptying publishing cache...")
 
 	// For each cached mqttPublishing, re-send the message only once then remove it from cache no matter whether it succeeds or fails.
-	for k, msg := range c.publishingCache {
+	c.publishingCache.ForEach(func(k string, msg mqttPublishing) {
 		c.logger.Printf("Re-sending message ID %s", k)
 		_ = c.Publish(msg.Exchange, msg.RoutingKey, msg.Mandatory, msg.Immediate, msg.Msg, true)
 
-		delete(c.publishingCache, k)
-	}
+		c.publishingCache.Delete(k)
+	})
 
 	c.logger.Printf("Publishing cache emptied")
 }
@@ -371,7 +376,7 @@ func (c *connectionManager) Publish(exchange, routingKey string, mandatory, imme
 
 			c.logger.Printf("Caching unsuccessful publishing ID %s", msg.MessageId)
 
-			c.publishingCache[mqttMsg.HashCode()] = mqttMsg
+			c.publishingCache.Put(mqttMsg.HashCode(), mqttMsg)
 		}
 
 		return errConnectionOrChannelClosed
