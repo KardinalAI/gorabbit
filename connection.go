@@ -369,6 +369,8 @@ func (c *connectionManager) Publish(exchange, routingKey string, mandatory, imme
 				Msg:        msg,
 			}
 
+			c.logger.Printf("Caching unsuccessful publishing ID %s", msg.MessageId)
+
 			c.publishingCache[mqttMsg.HashCode()] = mqttMsg
 		}
 
