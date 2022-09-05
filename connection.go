@@ -129,6 +129,8 @@ func (c *connectionManager) newChannel() error {
 
 	c.channel = ch
 
+	go c.emptyPublishingCache()
+
 	const prefetchCount = 10
 
 	const prefetchSize = 0
