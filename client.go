@@ -14,6 +14,7 @@ var consumed *ttlMap[uint64, interface{}]
 
 type MQTTClient interface {
 	// Disconnect launches the disconnection process.
+	// This operation disables to client permanently.
 	Disconnect() error
 
 	// SendMessage will send the desired payload through the selected channel.
