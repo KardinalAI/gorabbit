@@ -15,7 +15,7 @@ type ttlMap[K, V any] struct {
 	l sync.Mutex
 }
 
-func newTTLMap[K, V any](ln int, maxTTL time.Duration) *ttlMap[K, V] {
+func newTTLMap[K, V any](ln uint64, maxTTL time.Duration) *ttlMap[K, V] {
 	m := &ttlMap[K, V]{m: make(map[any]ttlMapValue[V], ln)}
 
 	go func() {

@@ -12,11 +12,6 @@ import (
 
 var consumed *ttlMap[uint64, interface{}]
 
-const (
-	consumedCacheTTL      = 8 * time.Second
-	consumeCacheMaxLength = 1024
-)
-
 type MQTTClient interface {
 	// Disconnect launches the disconnection process.
 	Disconnect() error
@@ -25,9 +20,19 @@ type MQTTClient interface {
 	//  - exchange is the name of the exchange targeted for event publishing.
 	//  - routingKey is the route that the exchange will use to forward the message.
 	//  - payload is the object you want to send as a byte array.
+	// Returns an error if the connection to the RabbitMQ server is down.
+	SendMessage(exchange, routingKey string, payload []byte) error
+
+	// SendMessageWithOptions will send the desired payload through the selected channel.
+	//  - exchange is the name of the exchange targeted for event publishing.
+	//  - routingKey is the route that the exchange will use to forward the message.
+	//  - payload is the object you want to send as a byte array.
 	// Optionally you can add sendOptions for extra customization.
 	// Returns an error if the connection to the RabbitMQ server is down.
-	SendMessage(exchange string, routingKey string, payload []byte, options ...*sendOptions) error
+	SendMessageWithOptions(exchange, routingKey string, payload []byte, options *sendOptions) error
+
+	// MessageBuilder returns a messageBuilder that brings a flexible approach to sending a message.
+	MessageBuilder() *messageBuilder
 
 	// RetryMessage will acknowledge an incoming AMQPMessage event and redeliver it if the maxRetry property is not exceeded.
 	// Returns an error if the connection to the RabbitMQ server is down.
@@ -156,17 +161,27 @@ func NewClient(options *clientOptions, listeners ...*ClientListeners) MQTTClient
 		statusListeners = listeners[0]
 	}
 
-	client.connectionManager = newManager(client.ctx, dialURL, options.keepAlive, options.retryDelay, options.maxRetry, statusListeners, client.logger)
+	client.connectionManager = newManager(
+		client.ctx,
+		dialURL,
+		options.keepAlive,
+		options.retryDelay,
+		options.maxRetry,
+		options.publishingCacheSize,
+		options.publishingCacheTTL,
+		statusListeners,
+		client.logger,
+	)
 
 	// If the consumed cache is not present, we instantiate it.
 	if consumed == nil {
-		consumed = newTTLMap[uint64, interface{}](consumeCacheMaxLength, consumedCacheTTL)
+		consumed = newTTLMap[uint64, interface{}](options.consumedCacheSize, options.consumedCacheTTL)
 	}
 
 	return client
 }
 
-func (client *mqttClient) SendMessage(exchange string, routingKey string, payload []byte, options ...*sendOptions) error {
+func (client *mqttClient) SendMessage(exchange string, routingKey string, payload []byte) error {
 	// client is disabled, so we do nothing and return no error.
 	if client.disabled {
 		return nil
@@ -185,11 +200,46 @@ func (client *mqttClient) SendMessage(exchange string, routingKey string, payloa
 		Timestamp: time.Now(),
 	}
 
-	if options != nil && options[0] != nil {
-		opts := options[0]
+	// Publish the message via the official amqp package with our given configuration.
+	err := client.connectionManager.Publish(
+		exchange,   // exchange
+		routingKey, // routing key
+		false,      // mandatory
+		false,      // immediate
+		*publishing,
+		false,
+	)
 
-		publishing.Priority = opts.priority()
-		publishing.DeliveryMode = opts.mode()
+	// log the error
+	if err != nil {
+		client.logger.Printf("Could not send message: %s", err.Error())
+	}
+
+	return err
+}
+
+func (client *mqttClient) SendMessageWithOptions(exchange string, routingKey string, payload []byte, options *sendOptions) error {
+	// client is disabled, so we do nothing and return no error.
+	if client.disabled {
+		return nil
+	}
+
+	publishing := &amqp.Publishing{
+		ContentType:  "text/plain",
+		Body:         payload,
+		Type:         routingKey,
+		Priority:     PriorityMedium.Uint8(),
+		DeliveryMode: Persistent.Uint8(),
+		MessageId:    uuid.NewString(),
+		Headers: map[string]interface{}{
+			RedeliveryHeader: 0,
+		},
+		Timestamp: time.Now(),
+	}
+
+	if options != nil {
+		publishing.Priority = options.priority()
+		publishing.DeliveryMode = options.mode()
 	}
 
 	// Publish the message via the official amqp package with our given configuration.
@@ -208,6 +258,10 @@ func (client *mqttClient) SendMessage(exchange string, routingKey string, payloa
 	}
 
 	return err
+}
+
+func (client *mqttClient) MessageBuilder() *messageBuilder {
+	return newMessageBuilder(client)
 }
 
 func (client *mqttClient) SubscribeToMessages(queue string, consumer string, autoAck bool) (<-chan AMQPMessage, error) {

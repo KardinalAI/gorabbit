@@ -7,11 +7,6 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-const (
-	publishingCacheTTL       = 60 * time.Second
-	publishingCacheMaxLength = 128
-)
-
 type connectionManager struct {
 	// uri represents the connection string to the RabbitMQ server.
 	uri string
@@ -48,7 +43,17 @@ type connectionManager struct {
 }
 
 // newManager instantiates a new connectionManager with given arguments.
-func newManager(ctx context.Context, uri string, keepAlive bool, retryDelay time.Duration, maxRetry uint, statusListeners *ClientListeners, logger Logger) *connectionManager {
+func newManager(
+	ctx context.Context,
+	uri string,
+	keepAlive bool,
+	retryDelay time.Duration,
+	maxRetry uint,
+	publishingCacheMaxLength uint64,
+	publishingCacheTTL time.Duration,
+	statusListeners *ClientListeners,
+	logger Logger,
+) *connectionManager {
 	c := &connectionManager{
 		uri:             uri,
 		ctx:             ctx,

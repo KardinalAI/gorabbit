@@ -4,14 +4,18 @@ import "time"
 
 // Default values for the clientOptions.
 const (
-	defaultHost       = "127.0.0.1"
-	defaultPort       = 5672
-	defaultUsername   = "guest"
-	defaultPassword   = "guest"
-	defaultKeepAlive  = true
-	defaultRetryDelay = 3 * time.Second
-	defaultMaxRetry   = 5
-	defaultMode       = Release
+	defaultHost                = "127.0.0.1"
+	defaultPort                = 5672
+	defaultUsername            = "guest"
+	defaultPassword            = "guest"
+	defaultKeepAlive           = true
+	defaultRetryDelay          = 3 * time.Second
+	defaultMaxRetry            = 5
+	defaultConsumedCacheTTL    = 8 * time.Second
+	defaultConsumedCacheSize   = 1024
+	defaultPublishingCacheTTL  = 60 * time.Second
+	defaultPublishingCacheSize = 128
+	defaultMode                = Release
 )
 
 // clientOptions is an unexported type that holds all necessary properties to launch a successful connection with an MQTTClient.
@@ -37,6 +41,18 @@ type clientOptions struct {
 	// maxRetry will define the number of retries when an AMQPMessage could not be processed.
 	maxRetry uint
 
+	// consumedCacheTTL defines the time to live for each consumed cache item.
+	consumedCacheTTL time.Duration
+
+	// consumedCacheSize defines the max length of the consumed cache.
+	consumedCacheSize uint64
+
+	// publishingCacheTTL defines the time to live for each publishing cache item.
+	publishingCacheTTL time.Duration
+
+	// publishingCacheSize defines the max length of the publishing cache.
+	publishingCacheSize uint64
+
 	// mode will specify whether logs are enabled or not.
 	mode string
 }
@@ -44,14 +60,18 @@ type clientOptions struct {
 // DefaultClientOptions will return a clientOptions with default values.
 func DefaultClientOptions() *clientOptions {
 	return &clientOptions{
-		host:       defaultHost,
-		port:       defaultPort,
-		username:   defaultUsername,
-		password:   defaultPassword,
-		keepAlive:  defaultKeepAlive,
-		retryDelay: defaultRetryDelay,
-		maxRetry:   defaultMaxRetry,
-		mode:       defaultMode,
+		host:                defaultHost,
+		port:                defaultPort,
+		username:            defaultUsername,
+		password:            defaultPassword,
+		keepAlive:           defaultKeepAlive,
+		retryDelay:          defaultRetryDelay,
+		maxRetry:            defaultMaxRetry,
+		consumedCacheTTL:    defaultConsumedCacheTTL,
+		consumedCacheSize:   defaultConsumedCacheSize,
+		publishingCacheTTL:  defaultPublishingCacheTTL,
+		publishingCacheSize: defaultPublishingCacheSize,
+		mode:                defaultMode,
 	}
 }
 
@@ -100,6 +120,34 @@ func (c *clientOptions) SetRetryDelay(delay time.Duration) *clientOptions {
 // SetMaxRetry will assign the max retry count.
 func (c *clientOptions) SetMaxRetry(retry uint) *clientOptions {
 	c.maxRetry = retry
+
+	return c
+}
+
+// SetConsumedCacheTTL will assign the consumed cache item TTL.
+func (c *clientOptions) SetConsumedCacheTTL(ttl time.Duration) *clientOptions {
+	c.consumedCacheTTL = ttl
+
+	return c
+}
+
+// SetConsumedCacheSize will assign the consumed cache max length.
+func (c *clientOptions) SetConsumedCacheSize(size uint64) *clientOptions {
+	c.consumedCacheSize = size
+
+	return c
+}
+
+// SetPublishingCacheTTL will assign the publishing cache item TTL.
+func (c *clientOptions) SetPublishingCacheTTL(ttl time.Duration) *clientOptions {
+	c.publishingCacheTTL = ttl
+
+	return c
+}
+
+// SetPublishingCacheSize will assign the publishing cache max length.
+func (c *clientOptions) SetPublishingCacheSize(size uint64) *clientOptions {
+	c.publishingCacheSize = size
 
 	return c
 }
