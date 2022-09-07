@@ -15,8 +15,10 @@ type connectionManager struct {
 	// ctx will be use as the main context for all functionalities.
 	ctx context.Context
 
+	// consumptionCtx manages the context for consumers.
 	consumptionCtx context.Context
 
+	// consumptionCancel holds the cancel func for when we should stop consumers from consuming.
 	consumptionCancel context.CancelFunc
 
 	// connection manages channels to handle operations such as message receptions and publishing.
