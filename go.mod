@@ -7,7 +7,6 @@ require (
 	github.com/rabbitmq/amqp091-go v1.4.0
 	github.com/stretchr/testify v1.8.0
 	gitlab.kardinal.ai/coretech/go-logging v0.0.0-20220211123430-1af982d63c8c
-	gitlab.kardinal.ai/coretech/gorabbit/v2 v2.1.0
 )
 
 require (

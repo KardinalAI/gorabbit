@@ -2,6 +2,7 @@ package gorabbit
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -14,10 +15,14 @@ type connectionManager struct {
 	// ctx will be use as the main context for all functionalities.
 	ctx context.Context
 
+	consumptionCtx context.Context
+
+	consumptionCancel context.CancelFunc
+
 	// connection manages channels to handle operations such as message receptions and publishing.
 	connection *amqp.Connection
 
-	// channel is responsible for sending and receiving AMQPMessage as well as other low level methods.
+	// channel is responsible for sending and receiving amqpMessage as well as other low level methods.
 	channel *amqp.Channel
 
 	// keepAlive will determine whether the re-connection and retry mechanisms should be triggered.
@@ -26,17 +31,17 @@ type connectionManager struct {
 	// retryDelay will define the delay for the re-connection and retry mechanism.
 	retryDelay time.Duration
 
-	// maxRetry will define the number of retries when an AMQPMessage could not be processed.
+	// maxRetry will define the number of retries when an amqpMessage could not be processed.
 	maxRetry uint
 
-	// subscriptions manages the status of all active subscriptions.
-	subscriptions subscriptionsHealth
+	// subscriptionsHealth manages the status of all active subscriptionsHealth.
+	subscriptionsHealth subscriptionsHealth
+
+	// consumers manages the registered consumptions.
+	consumers map[string]MessageConsumer
 
 	// publishingCache manages the caching of unpublished messages due to a connection error.
 	publishingCache *ttlMap[string, mqttPublishing]
-
-	// statusListeners holds listeners for each ConnectionStatus change.
-	statusListeners *ClientListeners
 
 	// logger is passed from the client for debugging purposes.
 	logger Logger
@@ -51,19 +56,18 @@ func newManager(
 	maxRetry uint,
 	publishingCacheMaxLength uint64,
 	publishingCacheTTL time.Duration,
-	statusListeners *ClientListeners,
 	logger Logger,
 ) *connectionManager {
 	c := &connectionManager{
-		uri:             uri,
-		ctx:             ctx,
-		keepAlive:       keepAlive,
-		retryDelay:      retryDelay,
-		maxRetry:        maxRetry,
-		subscriptions:   make(subscriptionsHealth),
-		publishingCache: newTTLMap[string, mqttPublishing](publishingCacheMaxLength, publishingCacheTTL),
-		statusListeners: statusListeners,
-		logger:          logger,
+		uri:                 uri,
+		ctx:                 ctx,
+		keepAlive:           keepAlive,
+		retryDelay:          retryDelay,
+		maxRetry:            maxRetry,
+		subscriptionsHealth: make(subscriptionsHealth),
+		consumers:           make(map[string]MessageConsumer),
+		publishingCache:     newTTLMap[string, mqttPublishing](publishingCacheMaxLength, publishingCacheTTL),
+		logger:              logger,
 	}
 
 	// If we don't want to keep trying to connect in case a first attempt fails, we instantiate a new connection and return an error if the operation failed.
@@ -79,13 +83,19 @@ func newManager(
 	// If we want to keep trying to connect after a failure, we asynchronously keep launching a connection request until it succeeds.
 	go func() {
 		for {
-			err := c.newConnection()
-			if err != nil {
-				c.logger.Printf("could not create new connection: %s", err.Error())
-				c.registerStatusChange(ConnFailed)
-				time.Sleep(retryDelay)
-			} else {
-				break
+			select {
+			case <-c.ctx.Done():
+				c.logger.Printf("Cannot try to connect because the context is done")
+				return
+			default:
+				err := c.newConnection()
+				if err != nil {
+					c.logger.Printf("Could not create new connection: %s", err.Error())
+					c.registerStatusChange(ConnFailed)
+					time.Sleep(retryDelay)
+				} else {
+					return
+				}
 			}
 		}
 	}()
@@ -93,6 +103,7 @@ func newManager(
 	return c
 }
 
+// newConnection instantiates the connection to RabbitMQ and requests a channel. Retry and KeepAlive mechanisms are also triggered.
 func (c *connectionManager) newConnection() error {
 	// If the connection string is empty we return an error.
 	if c.uri == "" {
@@ -122,6 +133,7 @@ func (c *connectionManager) newConnection() error {
 	return c.newChannel()
 }
 
+// newChannel instantiates a new channel. Retry and KeepAlive mechanisms are also triggered.
 func (c *connectionManager) newChannel() error {
 	// We request a channel from the previously opened connection.
 	ch, err := c.connection.Channel()
@@ -134,7 +146,16 @@ func (c *connectionManager) newChannel() error {
 
 	c.channel = ch
 
+	// We make sure to empty publishing cache once the channel is up.
 	go c.emptyPublishingCache()
+
+	// We know for sure that the consumptionCtx was non-existent or canceled on ChanDown event, so we instantiate a new one.
+	c.consumptionCtx, c.consumptionCancel = context.WithCancel(c.ctx)
+
+	for _, consumer := range c.consumers {
+		// We launch consumptions once channel is up.
+		go c.beginConsumption(consumer)
+	}
 
 	const prefetchCount = 10
 
@@ -156,38 +177,122 @@ func (c *connectionManager) newChannel() error {
 	return nil
 }
 
-// registerStatusChange will trigger an action on ConnectionStatus change.
-// Every ConnectionStatus has its own optional listener, that is triggered only if declared.
-func (c *connectionManager) registerStatusChange(status ConnectionStatus) {
-	if c.statusListeners == nil {
-		return
-	}
+// keepConnectionAlive listens to a connection close notification and tries to re-connect after waiting for a given retryDelay.
+// This mechanism runs indefinitely or until the client is closed.
+func (c *connectionManager) keepConnectionAlive() {
+	for {
+		select {
+		case <-c.ctx.Done():
+			c.logger.Printf("Cannot keep connection alive because the context is done")
+			return
+		case err, ok := <-c.connection.NotifyClose(make(chan *amqp.Error)):
+			if err != nil {
+				c.logger.Printf("Connection closed: %s", err.Error())
+			}
 
+			c.registerStatusChange(ConnDown)
+
+			if !ok {
+				return
+			}
+
+		Loop:
+			for {
+				// Wait reconnectDelay before trying to reconnect.
+				time.Sleep(c.retryDelay)
+
+				select {
+				case <-c.ctx.Done():
+					c.logger.Printf("Cannot keep connection alive because the context is done")
+					return
+				default:
+					var err error
+					c.connection, err = amqp.Dial(c.uri)
+					if err == nil {
+						c.registerStatusChange(ConnUp)
+						break Loop
+					}
+				}
+			}
+		}
+	}
+}
+
+// keepChannelAlive listens to a channel close notification and tries to request a new channel after waiting for a given retryDelay.
+// This mechanism runs indefinitely or until the client is closed.
+func (c *connectionManager) keepChannelAlive() {
+	for {
+		select {
+		case <-c.ctx.Done():
+			c.logger.Printf("Cannot keep channel alive because the context is done")
+			return
+		case err, ok := <-c.channel.NotifyClose(make(chan *amqp.Error)):
+			if err != nil {
+				c.logger.Printf("Channel closed: %s", err.Error())
+			}
+
+			// We want to cancel the consumptionCtx to stop consumers from consuming a queue without a channel opened.
+			c.consumptionCancel()
+
+			c.registerStatusChange(ChanDown)
+
+			if !ok {
+				return
+			}
+
+		Loop:
+			for {
+				// Wait reconnectDelay before trying to reconnect.
+				time.Sleep(c.retryDelay)
+
+				select {
+				case <-c.ctx.Done():
+					c.logger.Printf("Cannot keep channel alive because the context is done")
+					return
+				default:
+					if c.connection == nil || c.connection.IsClosed() {
+						c.logger.Printf("Cannot create new channel without a connection")
+						continue
+					}
+
+					c.logger.Printf("Trying to create a new channel")
+
+					var err error
+					c.channel, err = c.connection.Channel()
+					if err == nil {
+						c.registerStatusChange(ChanUp)
+						go c.emptyPublishingCache()
+
+						// We know for sure that the consumptionCtx was canceled on ChanDown event, so we instantiate a new one.
+						c.consumptionCtx, c.consumptionCancel = context.WithCancel(c.ctx)
+
+						for _, consumer := range c.consumers {
+							go c.beginConsumption(consumer)
+						}
+
+						break Loop
+					}
+				}
+			}
+		}
+	}
+}
+
+// registerStatusChange will trigger a simple log on ConnectionStatus change.
+func (c *connectionManager) registerStatusChange(status ConnectionStatus) {
 	switch status {
 	case ConnFailed:
-		if c.statusListeners.OnConnectionFailed != nil {
-			c.statusListeners.OnConnectionFailed()
-		}
+		c.logger.Printf("Connection to RabbitMQ server failed")
 	case ConnUp:
-		if c.statusListeners.OnConnectionUp != nil {
-			c.statusListeners.OnConnectionUp()
-		}
+		c.logger.Printf("Connection to RabbitMQ succeeded")
 	case ChanUp:
-		if c.statusListeners.OnChannelUp != nil {
-			c.statusListeners.OnChannelUp()
-		}
+		c.logger.Printf("Client channel is up")
 	case ChanDown:
-		if c.statusListeners.OnChannelDown != nil {
-			c.statusListeners.OnChannelDown()
-		}
+		c.logger.Printf("Client channel is down")
 	case ConnDown:
-		if c.statusListeners.OnConnectionLost != nil {
-			c.statusListeners.OnConnectionLost()
-		}
+		c.logger.Printf("Connection to RabbitMQ server lost")
 	case ConnClosed:
-		if c.statusListeners.OnConnectionClosed != nil {
-			c.statusListeners.OnConnectionClosed()
-		}
+		c.logger.Printf("Client disconnected from the RabbitMQ server")
 	}
 }
 
@@ -250,101 +355,10 @@ func (c *connectionManager) isOperational() bool {
 	return true
 }
 
-// isHealthy return true if all registered subscriptions succeeded.
+// isHealthy return true if all registered subscriptionsHealth succeeded.
 // Returns false if one or more subscription failed.
 func (c *connectionManager) isHealthy() bool {
-	return c.subscriptions.IsHealthy()
-}
-
-// keepConnectionAlive listens to a connection close notification and tries to re-connect after waiting for a given retryDelay.
-// This mechanism runs indefinitely or until the client is closed.
-func (c *connectionManager) keepConnectionAlive() {
-	for {
-		select {
-		case <-c.ctx.Done():
-			c.logger.Printf("Cannot keep connection alive because the context is done")
-			return
-		case err, ok := <-c.connection.NotifyClose(make(chan *amqp.Error)):
-			if err != nil {
-				c.logger.Printf("Connection closed: %s", err.Error())
-			}
-
-			c.registerStatusChange(ConnDown)
-
-			if !ok {
-				return
-			}
-
-		Loop:
-			for {
-				// Wait reconnectDelay before trying to reconnect.
-				time.Sleep(c.retryDelay)
-
-				select {
-				case <-c.ctx.Done():
-					c.logger.Printf("Cannot keep connection alive because the context is done")
-					return
-				default:
-					var err error
-					c.connection, err = amqp.Dial(c.uri)
-					if err == nil {
-						c.registerStatusChange(ConnUp)
-						break Loop
-					}
-				}
-			}
-		}
-	}
-}
-
-// keepChannelAlive listens to a channel close notification and tries to request a new channel after waiting for a given retryDelay.
-// This mechanism runs indefinitely or until the client is closed.
-func (c *connectionManager) keepChannelAlive() {
-	for {
-		select {
-		case <-c.ctx.Done():
-			c.logger.Printf("Cannot keep channel alive because the context is done")
-			return
-		case err, ok := <-c.channel.NotifyClose(make(chan *amqp.Error)):
-			if err != nil {
-				c.logger.Printf("Channel closed: %s", err.Error())
-			}
-
-			c.registerStatusChange(ChanDown)
-
-			if !ok {
-				return
-			}
-
-		Loop:
-			for {
-				// Wait reconnectDelay before trying to reconnect.
-				time.Sleep(c.retryDelay)
-
-				select {
-				case <-c.ctx.Done():
-					c.logger.Printf("Cannot keep channel alive because the context is done")
-					return
-				default:
-					if c.connection == nil || c.connection.IsClosed() {
-						c.logger.Printf("Cannot create new channel without a connection")
-						continue
-					}
-
-					c.logger.Printf("Trying to create a new channel")
-
-					var err error
-					c.channel, err = c.connection.Channel()
-					if err == nil {
-						c.registerStatusChange(ChanUp)
-						go c.emptyPublishingCache()
-
-						break Loop
-					}
-				}
-			}
-		}
-	}
+	return c.subscriptionsHealth.IsHealthy()
 }
 
 // emptyPublishingCache re-sends all cached mqttPublishing that failed due to a disconnection error, as soon as the connection is up again.
@@ -366,6 +380,147 @@ func (c *connectionManager) emptyPublishingCache() {
 	})
 
 	c.logger.Printf("Publishing cache emptied")
+}
+
+// registerConsumer registers a new MessageConsumer and caches it inside the consumers cache (map).
+func (c *connectionManager) registerConsumer(consumer MessageConsumer) {
+	// If the consumer was not previously registered, we register it.
+	if _, ok := c.consumers[consumer.HashCode()]; !ok {
+		// Insert the consumer in cache (map).
+		c.consumers[consumer.HashCode()] = consumer
+
+		// If the connectionManager is operational, we can already start consuming.
+		if c.isOperational() {
+			// We consume asynchronously, otherwise this operation would be blocking.
+			go c.beginConsumption(consumer)
+		}
+	}
+}
+
+// beginConsumption handles the consumption mechanism for a given MessageConsumer.
+func (c *connectionManager) beginConsumption(consumer MessageConsumer) {
+	messages, err := c.Consume(consumer.Queue, consumer.Consumer, consumer.AutoAck, false, false, false, nil)
+	if err != nil {
+		// Check if the error is of type amqp.Error.
+		var amqpErr *amqp.Error
+
+		ok := errors.As(err, &amqpErr)
+
+		// If the error is an amqp.Error and is of type not found, we want to remove the consumer from cache otherwise,
+		// we risk an infinite loop of de-connection and re-connection to consume a non-existent queue.
+		if ok && amqpErr != nil && amqpErr.Code == amqp.NotFound {
+			c.logger.Printf("Queue '%s' does not exist", consumer.Queue)
+
+			delete(c.consumers, consumer.HashCode())
+
+			return
+		}
+
+		c.logger.Printf("Could not subscribe to queue '%s': %s", consumer.Queue, err.Error())
+
+		return
+	}
+
+	// If there is no error, we want to loop through every message received, indefinitely.
+	for {
+		select {
+		case <-c.consumptionCtx.Done():
+			// If the consumptionCtx was canceled (connection lost or channel closed), we stop consuming.
+			c.logger.Printf("Finished consuming messages from queue '%s'", consumer.Queue)
+			return
+		case message := <-messages:
+			// When a queue is deleted midway, a message with no delivery tag or ID is received.
+			if message.DeliveryTag == 0 && message.MessageId == "" {
+				c.logger.Printf("Queue '%s' was deleted", consumer.Queue)
+
+				// We want to remove the consumer to avoid getting into an infinite loop of consumption retry.
+				delete(c.consumers, consumer.HashCode())
+
+				return
+			}
+
+			c.logger.Printf("Received amqp delivery with tag %d and id %s", message.DeliveryTag, message.MessageId)
+
+			// We parse the message to extract information such as Microservice, Entity and Action.
+			parsed, parseErr := ParseMessage(message)
+
+			// If the message could not be parsed, we call the OnBadFormat hook if it exists.
+			if parseErr != nil {
+				c.logger.Printf("Could not parse AMQP message, calling bad format hook")
+
+				if consumer.OnBadFormat != nil {
+					consumer.OnBadFormat(message.RoutingKey, message.Body)
+				}
+
+				continue
+			}
+
+			// nolint: nestif // The complexity is necessary here.
+			// If a handler is found for the message's routingKey, we execute it.
+			if handler, found := consumer.Handlers[parsed.RoutingKey]; found {
+				err = handler(parsed.Body)
+
+				switch {
+				// If there was an error processing the message, but the retry mechanism was disabled.
+				case err != nil && c.maxRetry == 0:
+					nackErr := parsed.Reject(false)
+					if nackErr != nil {
+						c.logger.Printf("Could not Nack message with ID %s: %s", parsed.MessageId, nackErr)
+					}
+				// If there was an error processing the message and the retry mechanism was enabled.
+				case err != nil && c.maxRetry > 0:
+					retryErr := c.retryMessage(parsed, c.maxRetry)
+
+					// If the retry mechanism failed, we call the OnRetryError hook if it exists.
+					if retryErr != nil {
+						c.logger.Printf("Could not retry message with ID %s: %s", parsed.MessageId, retryErr)
+
+						if consumer.OnRetryError != nil {
+							consumer.OnRetryError(parsed.MessageId, retryErr)
+						}
+					}
+				// If there was no error.
+				default:
+					ackErr := parsed.Ack(false)
+					if ackErr != nil {
+						c.logger.Printf("Could not Ack message with ID %s: %s", parsed.MessageId, ackErr)
+					}
+				}
+			}
+		}
+	}
+}
+
+// retryMessage offers the possibility of retrying a message that could not be processed, a given number of times.
+func (c *connectionManager) retryMessage(event *amqpMessage, maxRetry uint) error {
+	// We first acknowledge the message to remove it from the queue.
+	if err := event.Ack(false); err != nil {
+		c.logger.Printf("Could not Ack message with ID %s", event.MessageId)
+
+		return err
+	}
+
+	// We increment the redelivery count in the message's header.
+	redeliveredCount := event.IncrementRedeliveryHeader()
+
+	c.logger.Printf("Incremented redelivered count to %d", redeliveredCount)
+
+	// If the redelivery count header is still below the maximum allowed.
+	if redeliveredCount < int32(maxRetry) {
+		c.logger.Printf("Redelivering message")
+
+		return c.Publish(
+			event.Exchange,
+			event.RoutingKey,
+			false,
+			false,
+			event.ToPublishing(),
+			false,
+		)
+	}
+
+	// Otherwise, we return a max retry reached error.
+	return errMaxRetryReached
 }
 
 // Publish does the same as the native amqp publish method, but with some higher level functionalities.
@@ -415,7 +570,7 @@ func (c *connectionManager) Consume(queue, consumer string, autoAck, exclusive, 
 		args,
 	)
 
-	c.subscriptions.AddSubscription(queue, err)
+	c.subscriptionsHealth.AddSubscription(queue, err)
 
 	return messages, err
 }

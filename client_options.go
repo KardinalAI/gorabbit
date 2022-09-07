@@ -38,7 +38,7 @@ type clientOptions struct {
 	// retryDelay will define the delay for the re-connection and retry mechanism.
 	retryDelay time.Duration
 
-	// maxRetry will define the number of retries when an AMQPMessage could not be processed.
+	// maxRetry will define the number of retries when an amqpMessage could not be processed.
 	maxRetry uint
 
 	// consumedCacheTTL defines the time to live for each consumed cache item.

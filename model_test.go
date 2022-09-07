@@ -3,7 +3,7 @@ package gorabbit_test
 import (
 	"testing"
 
-	"gitlab.kardinal.ai/coretech/gorabbit/v2"
+	"gitlab.kardinal.ai/coretech/gorabbit/v3"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/stretchr/testify/assert"
