@@ -439,6 +439,14 @@ func (c *connectionManager) beginConsumption(consumer MessageConsumer) {
 				return
 			}
 
+			// If autoAck flag is disabled, we need to acknowledge the message first, to remove it from queue.
+			if !consumer.AutoAck {
+				ackErr := message.Ack(false)
+				if ackErr != nil {
+					c.logger.Printf("Could not Ack message with ID %s: %s", message.MessageId, ackErr)
+				}
+			}
+
 			c.logger.Printf("Received amqp delivery with tag %d and id %s", message.DeliveryTag, message.MessageId)
 
 			// We parse the message to extract information such as Microservice, Entity and Action.
@@ -460,15 +468,8 @@ func (c *connectionManager) beginConsumption(consumer MessageConsumer) {
 			if handler, found := consumer.Handlers[parsed.RoutingKey]; found {
 				err = handler(parsed.Body)
 
-				switch {
-				// If there was an error processing the message, but the retry mechanism was disabled.
-				case err != nil && c.maxRetry == 0:
-					nackErr := parsed.Reject(false)
-					if nackErr != nil {
-						c.logger.Printf("Could not Nack message with ID %s: %s", parsed.MessageId, nackErr)
-					}
-				// If there was an error processing the message and the retry mechanism was enabled.
-				case err != nil && c.maxRetry > 0:
+				// If we receive an error and the retry mechanism is activated, we retry the message.
+				if err != nil && c.maxRetry > 0 {
 					retryErr := c.retryMessage(parsed, c.maxRetry)
 
 					// If the retry mechanism failed, we call the OnRetryError hook if it exists.
@@ -479,12 +480,6 @@ func (c *connectionManager) beginConsumption(consumer MessageConsumer) {
 							consumer.OnRetryError(parsed.MessageId, retryErr)
 						}
 					}
-				// If there was no error.
-				default:
-					ackErr := parsed.Ack(false)
-					if ackErr != nil {
-						c.logger.Printf("Could not Ack message with ID %s: %s", parsed.MessageId, ackErr)
-					}
 				}
 			}
 		}
@@ -493,13 +488,6 @@ func (c *connectionManager) beginConsumption(consumer MessageConsumer) {
 
 // retryMessage offers the possibility of retrying a message that could not be processed, a given number of times.
 func (c *connectionManager) retryMessage(event *amqpMessage, maxRetry uint) error {
-	// We first acknowledge the message to remove it from the queue.
-	if err := event.Ack(false); err != nil {
-		c.logger.Printf("Could not Ack message with ID %s", event.MessageId)
-
-		return err
-	}
-
 	// We increment the redelivery count in the message's header.
 	redeliveredCount := event.IncrementRedeliveryHeader()
 
