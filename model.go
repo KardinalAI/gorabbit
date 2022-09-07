@@ -61,7 +61,7 @@ func (m *sendOptions) SetMode(mode DeliveryMode) *sendOptions {
 	return m
 }
 
-type AMQPMessage struct {
+type amqpMessage struct {
 	amqp.Delivery
 	Type         string
 	Microservice string
@@ -69,17 +69,17 @@ type AMQPMessage struct {
 	Action       string
 }
 
-func (msg *AMQPMessage) GetRedeliveryCount() int {
+func (msg *amqpMessage) GetRedeliveryCount() int32 {
 	val, ok := msg.Headers[RedeliveryHeader]
 
 	if !ok {
 		return 0
 	} else {
-		return int(val.(int32))
+		return val.(int32)
 	}
 }
 
-func (msg *AMQPMessage) IncrementRedeliveryHeader() int {
+func (msg *amqpMessage) IncrementRedeliveryHeader() int32 {
 	redeliveredCount := msg.GetRedeliveryCount()
 	redeliveredCount++
 
@@ -92,7 +92,7 @@ func (msg *AMQPMessage) IncrementRedeliveryHeader() int {
 	return redeliveredCount
 }
 
-func (msg *AMQPMessage) Ack(multiple bool) error {
+func (msg *amqpMessage) Ack(multiple bool) error {
 	if msg.Acknowledger == nil {
 		return errDeliveryNotInitialized
 	}
@@ -112,7 +112,7 @@ func (msg *AMQPMessage) Ack(multiple bool) error {
 	return nil
 }
 
-func (msg *AMQPMessage) Nack(multiple bool, requeue bool) error {
+func (msg *amqpMessage) Nack(multiple bool, requeue bool) error {
 	if msg.Acknowledger == nil {
 		return errDeliveryNotInitialized
 	}
@@ -132,7 +132,7 @@ func (msg *AMQPMessage) Nack(multiple bool, requeue bool) error {
 	return nil
 }
 
-func (msg *AMQPMessage) Reject(requeue bool) error {
+func (msg *amqpMessage) Reject(requeue bool) error {
 	if msg.Acknowledger == nil {
 		return errDeliveryNotInitialized
 	}
@@ -152,7 +152,7 @@ func (msg *AMQPMessage) Reject(requeue bool) error {
 	return nil
 }
 
-func (msg *AMQPMessage) ToPublishing() amqp.Publishing {
+func (msg *amqpMessage) ToPublishing() amqp.Publishing {
 	return amqp.Publishing{
 		ContentType: msg.ContentType,
 		Body:        msg.Body,
@@ -161,38 +161,6 @@ func (msg *AMQPMessage) ToPublishing() amqp.Publishing {
 		MessageId:   msg.MessageId,
 		Headers:     msg.Headers,
 	}
-}
-
-// ParseMessage takes an amqp.Deliver as argument, extracts the routingKey from the Type, and parses it as a AMQPMessage.
-// This method is purely for Kardinal's needs and should be removed in the library is made public.
-func ParseMessage(delivery amqp.Delivery) (*AMQPMessage, error) {
-	messageArgs := delivery.Type
-
-	if messageArgs == "" {
-		return nil, errEmptyStringParse
-	}
-
-	splitArgs := strings.Split(messageArgs, ".")
-
-	const expectedArgsLength = 4
-
-	if len(splitArgs) < expectedArgsLength {
-		return nil, errInvalidFormat
-	}
-
-	for _, arg := range splitArgs {
-		if arg == "" {
-			return nil, errEmptyArgument
-		}
-	}
-
-	return &AMQPMessage{
-		Delivery:     delivery,
-		Type:         splitArgs[0],
-		Microservice: splitArgs[1],
-		Entity:       splitArgs[2],
-		Action:       splitArgs[3],
-	}, nil
 }
 
 type subscriptionsHealth map[string]bool
@@ -225,4 +193,36 @@ type mqttPublishing struct {
 
 func (m mqttPublishing) HashCode() string {
 	return m.Msg.MessageId
+}
+
+// ParseMessage takes an amqp.Deliver as argument, extracts the routingKey from the Type, and parses it as a amqpMessage.
+// This method is purely for Kardinal's needs and should be removed in the library is made public.
+func ParseMessage(delivery amqp.Delivery) (*amqpMessage, error) {
+	messageArgs := delivery.Type
+
+	if messageArgs == "" {
+		return nil, errEmptyStringParse
+	}
+
+	splitArgs := strings.Split(messageArgs, ".")
+
+	const expectedArgsLength = 4
+
+	if len(splitArgs) < expectedArgsLength {
+		return nil, errInvalidFormat
+	}
+
+	for _, arg := range splitArgs {
+		if arg == "" {
+			return nil, errEmptyArgument
+		}
+	}
+
+	return &amqpMessage{
+		Delivery:     delivery,
+		Type:         splitArgs[0],
+		Microservice: splitArgs[1],
+		Entity:       splitArgs[2],
+		Action:       splitArgs[3],
+	}, nil
 }

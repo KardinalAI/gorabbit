@@ -32,20 +32,21 @@ type MQTTClient interface {
 	// Returns an error if the connection to the RabbitMQ server is down.
 	SendMessageWithOptions(exchange, routingKey string, payload []byte, options *sendOptions) error
 
-	// MessageBuilder returns a messageBuilder that brings a flexible approach to sending a message.
-	MessageBuilder() *messageBuilder
-
-	// RetryMessage will acknowledge an incoming AMQPMessage event and redeliver it if the maxRetry property is not exceeded.
-	// Returns an error if the connection to the RabbitMQ server is down.
-	RetryMessage(event *AMQPMessage, maxRetry int) error
-
 	// SubscribeToMessages will connect to a queue and consume all incoming events from it.
 	// Before an event is consumed, it will be parsed via parseMessage method and then sent back for consumption
 	//  - queue is the name of the queue to connect to.
 	//  - consumer[optional] is the unique identifier of the consumer. Leaving it empty will generate a unique identifier.
 	//  - if autoAck is set to true, received events will be auto acknowledged as soon as they are consumed (received).
-	// returns an incoming channel of AMQPMessage (messages).
-	SubscribeToMessages(queue string, consumer string, autoAck bool) (<-chan AMQPMessage, error)
+	// returns an incoming channel of amqpMessage (messages).
+	SubscribeToMessages(queue string, consumer string, autoAck bool) (<-chan amqpMessage, error)
+
+	// RegisterConsumer will register a MessageConsumer for internal queue subscription and message processing.
+	// The MessageConsumer will hold a list of MQTTMessageHandlers to internalize message processing.
+	// Based on the return of error of each handler, the process of acknowledgment, rejection and retry of messages is
+	// fully handled internally.
+	// Furthermore, connection lost and channel errors are also internally handled by the connectionManager that will keep consumers
+	// alive if and when necessary.
+	RegisterConsumer(consumer MessageConsumer)
 
 	// CreateQueue will create a new queue from QueueConfig.
 	CreateQueue(config QueueConfig) error
@@ -63,7 +64,7 @@ type MQTTClient interface {
 
 	// PopMessageFromQueue retrieves the first message of a queue. The message can then be auto-acknowledged or not.
 	// Returns an error if the connection to the RabbitMQ server is down or the queue does not exist or is empty.
-	PopMessageFromQueue(queue string, autoAck bool) (*AMQPMessage, error)
+	PopMessageFromQueue(queue string, autoAck bool) (*amqpMessage, error)
 
 	// PurgeQueue will empty a queue of all its current messages.
 	// Returns an error if the connection to the RabbitMQ server is down or the queue does not exist.
@@ -77,7 +78,7 @@ type MQTTClient interface {
 	// Returns an error if the connection to the RabbitMQ server is down or the exchange does not exist.
 	DeleteExchange(exchange string) error
 
-	// ReadyCheck returns true if the client is fully operational, connected to the RabbitMQ and have all its subscriptions up.
+	// ReadyCheck returns true if the client is fully operational, connected to the RabbitMQ and have all its subscriptionsHealth up.
 	// Returns false if one of the above failed.
 	ReadyCheck() bool
 }
@@ -112,8 +113,7 @@ type mqttClient struct {
 
 // NewClient will instantiate a new MQTTClient.
 // If options is set to nil, the DefaultClientOptions will be used.
-// Optionally, listeners can be passed for extra high-level functionalities, or simple logs with DefaultListeners.
-func NewClient(options *clientOptions, listeners ...*ClientListeners) MQTTClient {
+func NewClient(options *clientOptions) MQTTClient {
 	// If no options is passed, we use the DefaultClientOptions.
 	if options == nil {
 		options = DefaultClientOptions()
@@ -156,12 +156,6 @@ func NewClient(options *clientOptions, listeners ...*ClientListeners) MQTTClient
 
 	dialURL := fmt.Sprintf("amqp://%s:%s@%s:%d/", client.Username, client.Password, client.Host, client.Port)
 
-	var statusListeners *ClientListeners
-
-	if listeners != nil && listeners[0] != nil {
-		statusListeners = listeners[0]
-	}
-
 	client.connectionManager = newManager(
 		client.ctx,
 		dialURL,
@@ -170,7 +164,6 @@ func NewClient(options *clientOptions, listeners ...*ClientListeners) MQTTClient
 		options.maxRetry,
 		options.publishingCacheSize,
 		options.publishingCacheTTL,
-		statusListeners,
 		client.logger,
 	)
 
@@ -261,18 +254,14 @@ func (client *mqttClient) SendMessageWithOptions(exchange string, routingKey str
 	return err
 }
 
-func (client *mqttClient) MessageBuilder() *messageBuilder {
-	return newMessageBuilder(client)
-}
-
-func (client *mqttClient) SubscribeToMessages(queue string, consumer string, autoAck bool) (<-chan AMQPMessage, error) {
+func (client *mqttClient) SubscribeToMessages(queue string, consumer string, autoAck bool) (<-chan amqpMessage, error) {
 	// client is disabled, so we do nothing and return no error.
 	if client.disabled {
 		// nolint: nilnil // We must return <nil, nil>
 		return nil, nil
 	}
 
-	// Consume events via the official amqp package with our given configuration.
+	// RegisterConsumer events via the official amqp package with our given configuration.
 	messages, err := client.connectionManager.Consume(
 		queue,    // queue
 		consumer, // consumer
@@ -289,7 +278,7 @@ func (client *mqttClient) SubscribeToMessages(queue string, consumer string, aut
 		return nil, err
 	}
 
-	parsedDeliveries := make(chan AMQPMessage)
+	parsedDeliveries := make(chan amqpMessage)
 
 	go func() {
 		for message := range messages {
@@ -304,7 +293,7 @@ func (client *mqttClient) SubscribeToMessages(queue string, consumer string, aut
 			} else {
 				client.logger.Printf("could not parse AMQP message, sending native delivery")
 
-				parsedDeliveries <- AMQPMessage{
+				parsedDeliveries <- amqpMessage{
 					Delivery: message,
 				}
 			}
@@ -312,6 +301,15 @@ func (client *mqttClient) SubscribeToMessages(queue string, consumer string, aut
 	}()
 
 	return parsedDeliveries, nil
+}
+
+func (client *mqttClient) RegisterConsumer(consumer MessageConsumer) {
+	// client is disabled, so we do nothing and return no error.
+	if client.disabled {
+		return
+	}
+
+	client.connectionManager.registerConsumer(consumer)
 }
 
 func (client *mqttClient) Disconnect() error {
@@ -335,38 +333,6 @@ func (client *mqttClient) Disconnect() error {
 	client.disabled = true
 
 	return nil
-}
-
-func (client *mqttClient) RetryMessage(event *AMQPMessage, maxRetry int) error {
-	// client is disabled, so we do nothing and return no error.
-	if client.disabled {
-		return nil
-	}
-
-	if err := event.Ack(false); err != nil {
-		client.logger.Printf("Could not acknowledge message %s", event.MessageId)
-
-		return err
-	}
-
-	redeliveredCount := event.IncrementRedeliveryHeader()
-
-	client.logger.Printf("Incremented redelivered count to %d", redeliveredCount)
-
-	if redeliveredCount <= maxRetry {
-		client.logger.Printf("Redelivering message")
-
-		return client.connectionManager.Publish(
-			event.Exchange,
-			event.RoutingKey,
-			false,
-			false,
-			event.ToPublishing(),
-			false,
-		)
-	}
-
-	return errMaxRetryReached
 }
 
 func (client *mqttClient) CreateQueue(config QueueConfig) error {
@@ -455,7 +421,7 @@ func (client *mqttClient) GetNumberOfMessages(config QueueConfig) (int, error) {
 	return q.Messages, nil
 }
 
-func (client *mqttClient) PopMessageFromQueue(queue string, autoAck bool) (*AMQPMessage, error) {
+func (client *mqttClient) PopMessageFromQueue(queue string, autoAck bool) (*amqpMessage, error) {
 	// client is disabled, so we do nothing and return no error.
 	if client.disabled {
 		// nolint: nilnil // We must return <nil, nil>
@@ -477,7 +443,7 @@ func (client *mqttClient) PopMessageFromQueue(queue string, autoAck bool) (*AMQP
 	parsed, parseErr := ParseMessage(m)
 
 	if parseErr != nil {
-		return &AMQPMessage{
+		return &amqpMessage{
 			Delivery: m,
 		}, nil
 	}

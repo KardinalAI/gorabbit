@@ -9,7 +9,7 @@ This module depends on the official [Go RabbitMQ library](https://github.com/rab
 To add this module to your project, simple run the following command:
 
 ```bash
-go get gitlab.kardinal.ai/coretech/gorabbit/v2
+go get gitlab.kardinal.ai/coretech/gorabbit/v3
 ```
 
 If you get an error regarding the host not found, run the following command:
