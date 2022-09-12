@@ -1,4 +1,4 @@
-package channel
+package gorabbit
 
 import "fmt"
 
@@ -11,12 +11,14 @@ type MessageRedirection struct {
 }
 
 type MessageConsumer struct {
-	Queue        string
-	Name         string
-	AutoAck      bool
-	Handlers     MQTTMessageHandlers
-	Redirections []MessageRedirection
-	OnRetryError func(string, error)
+	Queue         string
+	Name          string
+	PrefetchSize  int
+	PrefetchCount int
+	AutoAck       bool
+	Handlers      MQTTMessageHandlers
+	Redirections  []MessageRedirection
+	OnRetryError  func(string, error)
 }
 
 func (c MessageConsumer) HashCode() string {

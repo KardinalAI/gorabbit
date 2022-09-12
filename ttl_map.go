@@ -71,5 +71,7 @@ func (m *ttlMap[K, V]) ForEach(process func(k K, v V)) {
 }
 
 func (m *ttlMap[K, V]) Delete(k K) {
-	delete(m.m, k)
+	if _, ok := m.m[k]; ok {
+		delete(m.m, k)
+	}
 }

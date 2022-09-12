@@ -15,20 +15,24 @@ const (
 
 const (
 	RedeliveryHeader = "x-redelivered-count"
+	MaxRetryHeader   = "x-death"
+)
+
+// Connection Types.
+
+type ConnectionType string
+
+const (
+	Consumer  ConnectionType = "consumer"
+	Publisher ConnectionType = "publisher"
 )
 
 // Exchange Types.
 const (
 	TypeTopic   = "topic"
 	TypeDirect  = "direct"
-	TypeFanout  = "fanout"
+	Typeanout   = "fanout"
 	TypeHeaders = "headers"
-)
-
-// Kardinal Specific.
-const (
-	EventsExchange   = "events_exchange"
-	CommandsExchange = "commands_exchange"
 )
 
 type MessagePriority uint8
@@ -71,12 +75,13 @@ func isValidMode(mode string) bool {
 
 // Errors.
 var (
-	errConnectionOrChannelClosed = errors.New("connection or channel closed")
-	errEmptyURI                  = errors.New("amqp uri is empty")
-	errDeliveryNotInitialized    = errors.New("delivery not initialized")
-	errEmptyStringParse          = errors.New("could not parse empty string")
-	errInvalidFormat             = errors.New("invalid format")
-	errEmptyArgument             = errors.New("empty argument")
-	errMaxRetryReached           = errors.New("max retry has been reached")
-	errEmptyQueue                = errors.New("queue is empty")
+	errEmptyURI               = errors.New("amqp uri is empty")
+	errDeliveryNotInitialized = errors.New("delivery not initialized")
+	errEmptyStringParse       = errors.New("could not parse empty string")
+	errInvalidFormat          = errors.New("invalid format")
+	errEmptyArgument          = errors.New("empty argument")
+	errConnectionClosed       = errors.New("connection is closed")
+	errChannelClosed          = errors.New("channel is closed")
+	errConsumerExists         = errors.New("channel already has a consumer")
+	errConsumerAlreadyExists  = errors.New("consumer on declared queue already exists")
 )

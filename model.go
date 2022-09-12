@@ -24,16 +24,16 @@ type BindingConfig struct {
 	Exchange   string `yaml:"exchange"`
 }
 
-type sendOptions struct {
+type publishingOptions struct {
 	messagePriority *MessagePriority
 	deliveryMode    *DeliveryMode
 }
 
-func SendOptions() *sendOptions {
-	return &sendOptions{}
+func SendOptions() *publishingOptions {
+	return &publishingOptions{}
 }
 
-func (m *sendOptions) priority() uint8 {
+func (m *publishingOptions) priority() uint8 {
 	if m.messagePriority == nil {
 		return PriorityMedium.Uint8()
 	}
@@ -41,7 +41,7 @@ func (m *sendOptions) priority() uint8 {
 	return m.messagePriority.Uint8()
 }
 
-func (m *sendOptions) mode() uint8 {
+func (m *publishingOptions) mode() uint8 {
 	if m.deliveryMode == nil {
 		return Persistent.Uint8()
 	}
@@ -49,13 +49,13 @@ func (m *sendOptions) mode() uint8 {
 	return m.deliveryMode.Uint8()
 }
 
-func (m *sendOptions) SetPriority(priority MessagePriority) *sendOptions {
+func (m *publishingOptions) SetPriority(priority MessagePriority) *publishingOptions {
 	m.messagePriority = &priority
 
 	return m
 }
 
-func (m *sendOptions) SetMode(mode DeliveryMode) *sendOptions {
+func (m *publishingOptions) SetMode(mode DeliveryMode) *publishingOptions {
 	m.deliveryMode = &mode
 
 	return m
@@ -163,9 +163,9 @@ func (msg *amqpMessage) ToPublishing() amqp.Publishing {
 	}
 }
 
-type subscriptionsHealth map[string]bool
+type consumptionHealth map[string]bool
 
-func (s subscriptionsHealth) IsHealthy() bool {
+func (s consumptionHealth) IsHealthy() bool {
 	for _, v := range s {
 		if !v {
 			return false
@@ -175,7 +175,7 @@ func (s subscriptionsHealth) IsHealthy() bool {
 	return true
 }
 
-func (s subscriptionsHealth) AddSubscription(queue string, err error) {
+func (s consumptionHealth) AddSubscription(queue string, err error) {
 	if err != nil {
 		s[queue] = false
 	} else {
