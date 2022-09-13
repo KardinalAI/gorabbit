@@ -217,13 +217,11 @@ func (c *amqpChannel) close() error {
 		if err != nil {
 			return err
 		}
-
-		c.closed = true
-
-		return nil
 	}
 
-	return errChannelClosed
+	c.closed = true
+
+	return nil
 }
 
 // ready returns true if the channel exists and is not closed.

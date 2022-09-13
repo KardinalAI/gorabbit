@@ -60,7 +60,6 @@ func isValidMode(mode string) bool {
 var (
 	errEmptyURI                          = errors.New("amqp uri is empty")
 	errConnectionClosed                  = errors.New("connection is closed")
-	errChannelClosed                     = errors.New("channel is closed")
 	errConsumerAlreadyExists             = errors.New("consumer already exists")
 	errConsumerConnectionNotInitialized  = errors.New("consumerConnection is not initialized")
 	errPublisherConnectionNotInitialized = errors.New("publisherConnection is not initialized")

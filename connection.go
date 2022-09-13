@@ -200,13 +200,11 @@ func (a *amqpConnection) close() error {
 		if err != nil {
 			return err
 		}
-
-		a.closed = true
-
-		return nil
 	}
 
-	return errConnectionClosed
+	a.closed = true
+
+	return nil
 }
 
 // ready returns true of the connection exists and is not closed.
