@@ -7,43 +7,6 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-type amqpSaneConnections struct {
-	consumerConnection  *amqpConnection
-	publisherConnection *amqpConnection
-}
-
-func NewAMQPSaneConnections(ctx context.Context, uri string, keepAlive bool, retryDelay time.Duration, maxRetry uint, publishingCacheSize uint64, publishingCacheTTL time.Duration, logger Logger) *amqpSaneConnections {
-	return &amqpSaneConnections{
-		consumerConnection:  newConsumerConnection(ctx, uri, keepAlive, retryDelay, logger),
-		publisherConnection: newPublishingConnection(ctx, uri, keepAlive, retryDelay, maxRetry, publishingCacheSize, publishingCacheTTL, logger),
-	}
-}
-
-func (a *amqpSaneConnections) ready() bool {
-	if a.publisherConnection == nil || a.consumerConnection == nil {
-		return false
-	}
-
-	return a.publisherConnection.ready() && a.consumerConnection.ready()
-}
-
-func (a *amqpSaneConnections) healthy() bool {
-	if a.publisherConnection == nil || a.consumerConnection == nil {
-		return false
-	}
-
-	return a.publisherConnection.healthy() && a.consumerConnection.healthy()
-}
-
-func (a *amqpSaneConnections) close() error {
-	err := a.consumerConnection.close()
-	if err != nil {
-		return err
-	}
-
-	return a.publisherConnection.close()
-}
-
 // amqpConnection holds information about the management of the native amqp.Connection.
 type amqpConnection struct {
 	// ctx is the parent context and acts as a safeguard.
@@ -60,9 +23,6 @@ type amqpConnection struct {
 
 	// retryDelay defines the delay to wait before re-connecting if we lose connection and the keepAlive flag is set to true.
 	retryDelay time.Duration
-
-	// activeGuard is an inner property that informs whether the guard was activated on the connection or not.
-	activeGuard bool
 
 	// closed is an inner property that switches to true if the connection was explicitly closed.
 	closed bool
@@ -160,12 +120,10 @@ func (a *amqpConnection) open() error {
 
 	a.connection = conn
 
-	for _, channel := range a.channels {
-		channel.connection = a.connection
-	}
+	a.channels.updateParentConnection(a.connection)
 
 	// If the keepAlive flag is set to true but no guard is active, we activate a new guard.
-	if a.keepAlive && !a.activeGuard {
+	if a.keepAlive {
 		go a.guard()
 	}
 
@@ -202,8 +160,6 @@ func (a *amqpConnection) reconnect() {
 
 // guard is a connection safeguard that listens to connection close events and re-launches the connection.
 func (a *amqpConnection) guard() {
-	a.activeGuard = true
-
 	for {
 		select {
 		case <-a.ctx.Done():
@@ -224,6 +180,8 @@ func (a *amqpConnection) guard() {
 			}
 
 			go a.reconnect()
+
+			return
 		}
 	}
 }

@@ -7,8 +7,11 @@ import (
 )
 
 type connectionManager struct {
-	// connections holds the publishing and consuming connections required.
-	connections *amqpSaneConnections
+	// consumer holds the independent consuming connection.
+	consumer *amqpConnection
+
+	// publisher holds the independent publishing connection.
+	publisher *amqpConnection
 
 	// logger is passed from the client for debugging purposes.
 	logger Logger
@@ -26,7 +29,8 @@ func newManager(
 	logger Logger,
 ) *connectionManager {
 	c := &connectionManager{
-		connections: NewAMQPSaneConnections(ctx, uri, keepAlive, retryDelay, maxRetry, publishingCacheSize, publishingCacheTTL, logger),
+		consumer:  newConsumerConnection(ctx, uri, keepAlive, retryDelay, logger),
+		publisher: newPublishingConnection(ctx, uri, keepAlive, retryDelay, maxRetry, publishingCacheSize, publishingCacheTTL, logger),
 	}
 
 	return c
@@ -34,36 +38,56 @@ func newManager(
 
 // close offers the basic connection and channel close() mechanism but with extra higher level checks.
 func (c *connectionManager) close() error {
-	return c.connections.close()
+	if err := c.publisher.close(); err != nil {
+		return err
+	}
+
+	return c.consumer.close()
 }
 
-// isOperational returns true if both consumerConnection and publishingConnection are ready.
-func (c *connectionManager) isOperational() bool {
-	return c.connections.ready()
+// isReady returns true if both consumerConnection and publishingConnection are ready.
+func (c *connectionManager) isReady() bool {
+	if c.publisher == nil || c.consumer == nil {
+		return false
+	}
+
+	return c.publisher.ready() && c.consumer.ready()
 }
 
 // isHealthy returns true if both consumerConnection and publishingConnection are healthy.
 func (c *connectionManager) isHealthy() bool {
-	return c.connections.healthy()
+	if c.publisher == nil || c.consumer == nil {
+		return false
+	}
+
+	return c.publisher.healthy() && c.consumer.healthy()
 }
 
 // registerConsumer registers a new MessageConsumer.
 func (c *connectionManager) registerConsumer(consumer MessageConsumer) error {
-	return c.connections.consumerConnection.registerConsumer(consumer)
+	if c.consumer == nil {
+		return errConsumerNotInitialized
+	}
+
+	return c.consumer.registerConsumer(consumer)
 }
 
 func (c *connectionManager) publish(exchange, routingKey string, payload interface{}, options *publishingOptions) error {
+	if c.publisher == nil {
+		return errPublisherNotInitialized
+	}
+
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
 
-	return c.connections.publisherConnection.publish(exchange, routingKey, payloadBytes, options)
+	return c.publisher.publish(exchange, routingKey, payloadBytes, options)
 }
 
 //// ExchangeDeclare does the same as the native amqp exchangeDeclare method, but checks for the connectionManager operational status first.
-//func (c *connectionManager) ExchangeDeclare(name, kind string, durable, autoDelete, internal, noWait bool, args amqp.Table) error {
-//	if !c.isOperational() {
+// func (c *connectionManager) ExchangeDeclare(name, kind string, durable, autoDelete, internal, noWait bool, args amqp.Table) error {
+//	if !c.isReady() {
 //		return errConnectionOrChannelClosed
 //	}
 //
@@ -79,8 +103,8 @@ func (c *connectionManager) publish(exchange, routingKey string, payload interfa
 //}
 //
 //// ExchangeDelete does the same as the native amqp exchangeDelete method, but checks for the connectionManager operational status first.
-//func (c *connectionManager) ExchangeDelete(name string, ifUnused, noWait bool) error {
-//	if !c.isOperational() {
+// func (c *connectionManager) ExchangeDelete(name string, ifUnused, noWait bool) error {
+//	if !c.isReady() {
 //		return errConnectionOrChannelClosed
 //	}
 //
@@ -92,8 +116,8 @@ func (c *connectionManager) publish(exchange, routingKey string, payload interfa
 //}
 //
 //// QueueDeclare does the same as the native amqp queueDeclare method, but checks for the connectionManager operational status first.
-//func (c *connectionManager) QueueDeclare(name string, durable, autoDelete, exclusive, noWait bool, args amqp.Table) (amqp.Queue, error) {
-//	if !c.isOperational() {
+// func (c *connectionManager) QueueDeclare(name string, durable, autoDelete, exclusive, noWait bool, args amqp.Table) (amqp.Queue, error) {
+//	if !c.isReady() {
 //		return amqp.Queue{}, errConnectionOrChannelClosed
 //	}
 //
@@ -109,7 +133,7 @@ func (c *connectionManager) publish(exchange, routingKey string, payload interfa
 //
 //// QueueDeclarePassive does the same as the native amqp queueDeclarePassive method, but checks for the connectionManager operational status first.
 //func (c *connectionManager) QueueDeclarePassive(name string, durable, autoDelete, exclusive, noWait bool, args amqp.Table) (amqp.Queue, error) {
-//	if !c.isOperational() {
+//	if !c.isReady() {
 //		return amqp.Queue{}, errConnectionOrChannelClosed
 //	}
 //
@@ -125,7 +149,7 @@ func (c *connectionManager) publish(exchange, routingKey string, payload interfa
 //
 //// QueueBind does the same as the native amqp queueBind method, but checks for the connectionManager operational status first.
 //func (c *connectionManager) QueueBind(name, key, exchange string, noWait bool, args amqp.Table) error {
-//	if !c.isOperational() {
+//	if !c.isReady() {
 //		return errConnectionOrChannelClosed
 //	}
 //
@@ -140,7 +164,7 @@ func (c *connectionManager) publish(exchange, routingKey string, payload interfa
 //
 //// QueuePurge does the same as the native amqp queuePurge method, but checks for the connectionManager operational status first.
 //func (c *connectionManager) QueuePurge(name string, noWait bool) (int, error) {
-//	if !c.isOperational() {
+//	if !c.isReady() {
 //		return 0, errConnectionOrChannelClosed
 //	}
 //
@@ -152,7 +176,7 @@ func (c *connectionManager) publish(exchange, routingKey string, payload interfa
 //
 //// QueueDelete does the same as the native amqp queueDelete method, but checks for the connectionManager operational status first.
 //func (c *connectionManager) QueueDelete(name string, ifUnused, ifEmpty, noWait bool) (int, error) {
-//	if !c.isOperational() {
+//	if !c.isReady() {
 //		return 0, errConnectionOrChannelClosed
 //	}
 //
@@ -166,7 +190,7 @@ func (c *connectionManager) publish(exchange, routingKey string, payload interfa
 //
 //// Get does the same as the native amqp get method, but checks for the connectionManager operational status first.
 //func (c *connectionManager) Get(queue string, autoAck bool) (amqp.Delivery, bool, error) {
-//	if !c.isOperational() {
+//	if !c.isReady() {
 //		return amqp.Delivery{}, false, errConnectionOrChannelClosed
 //	}
 //

@@ -75,13 +75,14 @@ func isValidMode(mode string) bool {
 
 // Errors.
 var (
-	errEmptyURI               = errors.New("amqp uri is empty")
-	errDeliveryNotInitialized = errors.New("delivery not initialized")
-	errEmptyStringParse       = errors.New("could not parse empty string")
-	errInvalidFormat          = errors.New("invalid format")
-	errEmptyArgument          = errors.New("empty argument")
-	errConnectionClosed       = errors.New("connection is closed")
-	errChannelClosed          = errors.New("channel is closed")
-	errConsumerExists         = errors.New("channel already has a consumer")
-	errConsumerAlreadyExists  = errors.New("consumer on declared queue already exists")
+	errEmptyURI                = errors.New("amqp uri is empty")
+	errDeliveryNotInitialized  = errors.New("delivery not initialized")
+	errEmptyStringParse        = errors.New("could not parse empty string")
+	errInvalidFormat           = errors.New("invalid format")
+	errEmptyArgument           = errors.New("empty argument")
+	errConnectionClosed        = errors.New("connection is closed")
+	errChannelClosed           = errors.New("channel is closed")
+	errConsumerAlreadyExists   = errors.New("consumer on declared queue already exists")
+	errConsumerNotInitialized  = errors.New("consumer is not initialized")
+	errPublisherNotInitialized = errors.New("publisher is not initialized")
 )

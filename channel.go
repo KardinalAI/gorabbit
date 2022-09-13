@@ -3,8 +3,9 @@ package gorabbit
 import (
 	"context"
 	"fmt"
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -19,6 +20,12 @@ func (a amqpChannels) publishingChannel() *amqpChannel {
 	}
 
 	return nil
+}
+
+func (a amqpChannels) updateParentConnection(conn *amqp.Connection) {
+	for _, channel := range a {
+		channel.connection = conn
+	}
 }
 
 // amqpChannel holds information about the management of the native amqp.Channel.
@@ -37,9 +44,6 @@ type amqpChannel struct {
 
 	// retryDelay defines the delay to wait before re-connecting if the channel was closed and the keepAlive flag is set to true.
 	retryDelay time.Duration
-
-	// activeGuard is an inner property that informs whether the guard was activated on the channel or not.
-	activeGuard bool
 
 	// consumer is the MessageConsumer that holds all necessary information for the consumption of messages.
 	consumer *MessageConsumer
@@ -77,13 +81,23 @@ type amqpChannel struct {
 //   - consumer is the MessageConsumer that will hold consumption information.
 //   - maxRetry is the retry header for each message.
 func newConsumerChannel(ctx context.Context, connection *amqp.Connection, keepAlive bool, retryDelay time.Duration, consumer *MessageConsumer, logger Logger) *amqpChannel {
-	channel := newChannel(ctx, connection, keepAlive, retryDelay, logger, Consumer)
+	channel := &amqpChannel{
+		ctx:               ctx,
+		connection:        connection,
+		keepAlive:         keepAlive,
+		retryDelay:        retryDelay,
+		logger:            logger,
+		connectionType:    Consumer,
+		consumptionHealth: make(consumptionHealth),
+		consumer:          consumer,
+	}
 
-	channel.consumptionHealth = make(consumptionHealth)
+	// We open an initial channel.
+	err := channel.open()
 
-	err := channel.registerConsumer(consumer)
-	if err != nil {
-		logger.Printf("Could not register consumer %s: %s", consumer.Name, err.Error())
+	// If the channel failed to open and the keepAlive flag is set to true, we want to retry until success.
+	if err != nil && keepAlive {
+		go channel.retry()
 	}
 
 	return channel
@@ -97,26 +111,15 @@ func newConsumerChannel(ctx context.Context, connection *amqp.Connection, keepAl
 //   - consumer is the MessageConsumer that will hold consumption information.
 //   - maxRetry is the retry header for each message.
 func newPublishingChannel(ctx context.Context, connection *amqp.Connection, keepAlive bool, retryDelay time.Duration, maxRetry uint, publishingCacheSize uint64, publishingCacheTTL time.Duration, logger Logger) *amqpChannel {
-	channel := newChannel(ctx, connection, keepAlive, retryDelay, logger, Publisher)
-	channel.publishingCache = newTTLMap[string, mqttPublishing](publishingCacheSize, publishingCacheTTL)
-	channel.maxRetry = maxRetry
-
-	return channel
-}
-
-// newChannel initializes a new amqpChannel with given arguments.
-//   - ctx is the parent context.
-//   - connection is the parent amqp.Connection.
-//   - keepAlive will keep the channel alive if true.
-//   - retryDelay defines the delay between each retry, if the keepAlive flag is set to true.
-func newChannel(ctx context.Context, connection *amqp.Connection, keepAlive bool, retryDelay time.Duration, logger Logger, connectionType ConnectionType) *amqpChannel {
 	channel := &amqpChannel{
-		ctx:            ctx,
-		connection:     connection,
-		keepAlive:      keepAlive,
-		retryDelay:     retryDelay,
-		logger:         logger,
-		connectionType: connectionType,
+		ctx:             ctx,
+		connection:      connection,
+		keepAlive:       keepAlive,
+		retryDelay:      retryDelay,
+		logger:          logger,
+		connectionType:  Publisher,
+		publishingCache: newTTLMap[string, mqttPublishing](publishingCacheSize, publishingCacheTTL),
+		maxRetry:        maxRetry,
 	}
 
 	// We open an initial channel.
@@ -148,7 +151,7 @@ func (c *amqpChannel) open() error {
 	c.onChannelOpened()
 
 	// If the keepAlive flag is set to true but no guard is active, we activate a new guard.
-	if c.keepAlive && !c.activeGuard {
+	if c.keepAlive {
 		go c.guard()
 	}
 
@@ -183,8 +186,6 @@ func (c *amqpChannel) retry() {
 
 // guard is a channel safeguard that listens to channel close events and re-launches the channel.
 func (c *amqpChannel) guard() {
-	c.activeGuard = true
-
 	for {
 		select {
 		case <-c.ctx.Done():
@@ -203,6 +204,8 @@ func (c *amqpChannel) guard() {
 			c.onChannelClosed()
 
 			go c.retry()
+
+			return
 		}
 	}
 }
@@ -243,7 +246,11 @@ func (c *amqpChannel) onChannelOpened() {
 		// We re-instantiate the consumptionContext and consumptionCancel.
 		c.consumptionCtx, c.consumptionCancel = context.WithCancel(c.ctx)
 
-		go c.consume()
+		// This is just a safeguard.
+		if c.consumer != nil {
+			// If the consumer is present we want to start consuming.
+			go c.consume()
+		}
 	} else {
 		// If the publishing cache is empty, nothing to do here.
 		if c.publishingCache == nil || c.publishingCache.Len() == 0 {
@@ -276,31 +283,12 @@ func (c *amqpChannel) getID() string {
 	return fmt.Sprintf("%s_%s", c.consumer.Name, uuid.NewString())
 }
 
-// registerConsumer registers the MessageConsumer for the channel and starts consuming if the channel is ready.
-func (c *amqpChannel) registerConsumer(consumer *MessageConsumer) error {
-	// If a consumer is already defined, we cannot overwrite it.
-	if c.consumer != nil {
-		return errConsumerExists
-	}
-
-	c.consumer = consumer
-
+// consume handles the consumption mechanism.
+func (c *amqpChannel) consume() {
 	// Set the QOS, which defines how many messages can be processed at the same time.
 	err := c.channel.Qos(c.consumer.PrefetchCount, c.consumer.PrefetchSize, false)
 	if err != nil {
-	}
-
-	// If the channel is ready, we can begin consumption.
-	if c.ready() {
-		go c.consume()
-	}
-
-	return nil
-}
-
-// consume handles the consumption mechanism.
-func (c *amqpChannel) consume() {
-	if c.consumer == nil {
+		c.logger.Printf("Could not define QOS for consumer %s: %s", c.consumer.Name, err.Error())
 		return
 	}
 
@@ -309,6 +297,7 @@ func (c *amqpChannel) consume() {
 	c.consumptionHealth.AddSubscription(c.consumer.Queue, err)
 
 	if err != nil {
+		c.logger.Printf("Could not consume messages for queue %s", c.consumer.Queue)
 		return
 	}
 

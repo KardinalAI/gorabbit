@@ -37,14 +37,14 @@ type MQTTClient interface {
 	RegisterConsumer(consumer MessageConsumer) error
 
 	//// CreateQueue will create a new queue from QueueConfig.
-	//CreateQueue(config QueueConfig) error
+	// CreateQueue(config QueueConfig) error
 	//
 	//// CreateExchange will create a new exchange from ExchangeConfig.
-	//CreateExchange(config ExchangeConfig) error
+	// CreateExchange(config ExchangeConfig) error
 	//
 	//// BindExchangeToQueueViaRoutingKey will bind an exchange to a queue via a given routingKey.
 	//// Returns an error if the connection to the RabbitMQ server is down or if the exchange or queue does not exist.
-	//BindExchangeToQueueViaRoutingKey(exchange, queue, routingKey string) error
+	// BindExchangeToQueueViaRoutingKey(exchange, queue, routingKey string) error
 	//
 	//// GetNumberOfMessages retrieves the number of messages currently sitting in a given queue.
 	//// Returns an error if the connection to the RabbitMQ server is down or the queue does not exist.
@@ -213,7 +213,7 @@ func (client *mqttClient) Disconnect() error {
 	return nil
 }
 
-//func (client *mqttClient) CreateQueue(config QueueConfig) error {
+// func (client *mqttClient) CreateQueue(config QueueConfig) error {
 //	// client is disabled, so we do nothing and return no error.
 //	if client.disabled {
 //		return nil
@@ -245,7 +245,7 @@ func (client *mqttClient) Disconnect() error {
 //	return nil
 //}
 //
-//func (client *mqttClient) CreateExchange(config ExchangeConfig) error {
+// func (client *mqttClient) CreateExchange(config ExchangeConfig) error {
 //	// client is disabled, so we do nothing and return no error.
 //	if client.disabled {
 //		return nil
@@ -262,7 +262,7 @@ func (client *mqttClient) Disconnect() error {
 //	)
 //}
 //
-//func (client *mqttClient) BindExchangeToQueueViaRoutingKey(exchange, queue, routingKey string) error {
+// func (client *mqttClient) BindExchangeToQueueViaRoutingKey(exchange, queue, routingKey string) error {
 //	// client is disabled, so we do nothing and return no error.
 //	if client.disabled {
 //		return nil
@@ -374,5 +374,5 @@ func (client *mqttClient) ReadyCheck() bool {
 		return true
 	}
 
-	return client.connectionManager.isOperational() && client.connectionManager.isHealthy()
+	return client.connectionManager.isReady() && client.connectionManager.isHealthy()
 }

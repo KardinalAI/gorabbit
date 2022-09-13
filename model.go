@@ -176,11 +176,7 @@ func (s consumptionHealth) IsHealthy() bool {
 }
 
 func (s consumptionHealth) AddSubscription(queue string, err error) {
-	if err != nil {
-		s[queue] = false
-	} else {
-		s[queue] = true
-	}
+	s[queue] = err == nil
 }
 
 type mqttPublishing struct {
