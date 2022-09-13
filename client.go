@@ -48,23 +48,23 @@ type MQTTClient interface {
 	//
 	//// GetNumberOfMessages retrieves the number of messages currently sitting in a given queue.
 	//// Returns an error if the connection to the RabbitMQ server is down or the queue does not exist.
-	//GetNumberOfMessages(config QueueConfig) (int, error)
+	// GetNumberOfMessages(config QueueConfig) (int, error)
 	//
 	//// PopMessageFromQueue retrieves the first message of a queue. The message can then be auto-acknowledged or not.
 	//// Returns an error if the connection to the RabbitMQ server is down or the queue does not exist or is empty.
-	//PopMessageFromQueue(queue string, autoAck bool) (*amqpMessage, error)
+	// PopMessageFromQueue(queue string, autoAck bool) (*amqpMessage, error)
 	//
 	//// PurgeQueue will empty a queue of all its current messages.
 	//// Returns an error if the connection to the RabbitMQ server is down or the queue does not exist.
-	//PurgeQueue(queue string) error
+	// PurgeQueue(queue string) error
 	//
 	//// DeleteQueue permanently deletes an existing queue.
 	//// Returns an error if the connection to the RabbitMQ server is down or the queue does not exist.
-	//DeleteQueue(queue string) error
+	// DeleteQueue(queue string) error
 	//
 	//// DeleteExchange permanently deletes an existing exchange.
 	//// Returns an error if the connection to the RabbitMQ server is down or the exchange does not exist.
-	//DeleteExchange(exchange string) error
+	// DeleteExchange(exchange string) error
 
 	// ReadyCheck returns true if the client is fully operational, connected to the RabbitMQ and have all its consumptionHealth up.
 	// Returns false if one of the above failed.
@@ -277,7 +277,7 @@ func (client *mqttClient) Disconnect() error {
 //	)
 //}
 //
-//func (client *mqttClient) GetNumberOfMessages(config QueueConfig) (int, error) {
+// func (client *mqttClient) GetNumberOfMessages(config QueueConfig) (int, error) {
 //	// client is disabled, so we do nothing and return no error.
 //	if client.disabled {
 //		return -1, nil
@@ -299,7 +299,7 @@ func (client *mqttClient) Disconnect() error {
 //	return q.Messages, nil
 //}
 //
-//func (client *mqttClient) PopMessageFromQueue(queue string, autoAck bool) (*amqpMessage, error) {
+// func (client *mqttClient) PopMessageFromQueue(queue string, autoAck bool) (*amqpMessage, error) {
 //	// client is disabled, so we do nothing and return no error.
 //	if client.disabled {
 //		// nolint: nilnil // We must return <nil, nil>
@@ -329,7 +329,7 @@ func (client *mqttClient) Disconnect() error {
 //	return parsed, nil
 //}
 //
-//func (client *mqttClient) PurgeQueue(queue string) error {
+// func (client *mqttClient) PurgeQueue(queue string) error {
 //	// client is disabled, so we do nothing and return no error.
 //	if client.disabled {
 //		return nil
@@ -344,7 +344,7 @@ func (client *mqttClient) Disconnect() error {
 //	return nil
 //}
 //
-//func (client *mqttClient) DeleteQueue(queue string) error {
+// func (client *mqttClient) DeleteQueue(queue string) error {
 //	// client is disabled, so we do nothing and return no error.
 //	if client.disabled {
 //		return nil
@@ -359,7 +359,7 @@ func (client *mqttClient) Disconnect() error {
 //	return nil
 //}
 //
-//func (client *mqttClient) DeleteExchange(exchange string) error {
+// func (client *mqttClient) DeleteExchange(exchange string) error {
 //	// client is disabled, so we do nothing and return no error.
 //	if client.disabled {
 //		return nil

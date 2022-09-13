@@ -1,8 +1,6 @@
 package gorabbit
 
 import (
-	"strings"
-
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -63,10 +61,6 @@ func (m *publishingOptions) SetMode(mode DeliveryMode) *publishingOptions {
 
 type amqpMessage struct {
 	amqp.Delivery
-	Type         string
-	Microservice string
-	Entity       string
-	Action       string
 }
 
 func (msg *amqpMessage) GetRedeliveryCount() int32 {
@@ -189,36 +183,4 @@ type mqttPublishing struct {
 
 func (m mqttPublishing) HashCode() string {
 	return m.Msg.MessageId
-}
-
-// ParseMessage takes an amqp.Deliver as argument, extracts the routingKey from the Type, and parses it as a amqpMessage.
-// This method is purely for Kardinal's needs and should be removed in the library is made public.
-func ParseMessage(delivery amqp.Delivery) (*amqpMessage, error) {
-	messageArgs := delivery.Type
-
-	if messageArgs == "" {
-		return nil, errEmptyStringParse
-	}
-
-	splitArgs := strings.Split(messageArgs, ".")
-
-	const expectedArgsLength = 4
-
-	if len(splitArgs) < expectedArgsLength {
-		return nil, errInvalidFormat
-	}
-
-	for _, arg := range splitArgs {
-		if arg == "" {
-			return nil, errEmptyArgument
-		}
-	}
-
-	return &amqpMessage{
-		Delivery:     delivery,
-		Type:         splitArgs[0],
-		Microservice: splitArgs[1],
-		Entity:       splitArgs[2],
-		Action:       splitArgs[3],
-	}, nil
 }

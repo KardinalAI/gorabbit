@@ -78,7 +78,7 @@ type amqpChannel struct {
 // 	 - connection is the parent amqp.Connection.
 //   - keepAlive will keep the channel alive if true.
 //   - retryDelay defines the delay between each retry, if the keepAlive flag is set to true.
-//   - consumer is the MessageConsumer that will hold consumption information.
+//   - consumerConnection is the MessageConsumer that will hold consumption information.
 //   - maxRetry is the retry header for each message.
 func newConsumerChannel(ctx context.Context, connection *amqp.Connection, keepAlive bool, retryDelay time.Duration, consumer *MessageConsumer, logger Logger) *amqpChannel {
 	channel := &amqpChannel{
@@ -108,7 +108,7 @@ func newConsumerChannel(ctx context.Context, connection *amqp.Connection, keepAl
 // 	 - connection is the parent amqp.Connection.
 //   - keepAlive will keep the channel alive if true.
 //   - retryDelay defines the delay between each retry, if the keepAlive flag is set to true.
-//   - consumer is the MessageConsumer that will hold consumption information.
+//   - consumerConnection is the MessageConsumer that will hold consumption information.
 //   - maxRetry is the retry header for each message.
 func newPublishingChannel(ctx context.Context, connection *amqp.Connection, keepAlive bool, retryDelay time.Duration, maxRetry uint, publishingCacheSize uint64, publishingCacheTTL time.Duration, logger Logger) *amqpChannel {
 	channel := &amqpChannel{
@@ -248,7 +248,7 @@ func (c *amqpChannel) onChannelOpened() {
 
 		// This is just a safeguard.
 		if c.consumer != nil {
-			// If the consumer is present we want to start consuming.
+			// If the consumerConnection is present we want to start consuming.
 			go c.consume()
 		}
 	} else {
@@ -288,7 +288,7 @@ func (c *amqpChannel) consume() {
 	// Set the QOS, which defines how many messages can be processed at the same time.
 	err := c.channel.Qos(c.consumer.PrefetchCount, c.consumer.PrefetchSize, false)
 	if err != nil {
-		c.logger.Printf("Could not define QOS for consumer %s: %s", c.consumer.Name, err.Error())
+		c.logger.Printf("Could not define QOS for consumerConnection %s: %s", c.consumer.Name, err.Error())
 		return
 	}
 
