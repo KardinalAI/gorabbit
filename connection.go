@@ -160,6 +160,10 @@ func (a *amqpConnection) open() error {
 
 	a.connection = conn
 
+	for _, channel := range a.channels {
+		channel.connection = a.connection
+	}
+
 	// If the keepAlive flag is set to true but no guard is active, we activate a new guard.
 	if a.keepAlive && !a.activeGuard {
 		go a.guard()

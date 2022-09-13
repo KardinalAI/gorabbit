@@ -83,6 +83,7 @@ func newConsumerChannel(ctx context.Context, connection *amqp.Connection, keepAl
 
 	err := channel.registerConsumer(consumer)
 	if err != nil {
+		logger.Printf("Could not register consumer %s: %s", consumer.Name, err.Error())
 	}
 
 	return channel
@@ -338,6 +339,9 @@ func (c *amqpChannel) publish(exchange string, routingKey string, payload []byte
 		DeliveryMode: Persistent.Uint8(),
 		MessageId:    uuid.NewString(),
 		Timestamp:    time.Now(),
+		Headers: map[string]interface{}{
+			MaxRetryHeader: int(c.maxRetry),
+		},
 	}
 
 	// If options are declared, we add the option.
