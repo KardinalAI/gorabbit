@@ -94,8 +94,10 @@ type mqttClient struct {
 	// such as keep alive mechanism and health check.
 	connectionManager *connectionManager
 
+	// ctx holds the global context used for the client.
 	ctx context.Context
 
+	// cancel is the cancelFunc for the ctx.
 	cancel context.CancelFunc
 }
 

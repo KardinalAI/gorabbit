@@ -11,8 +11,6 @@ const (
 	defaultKeepAlive           = true
 	defaultRetryDelay          = 3 * time.Second
 	defaultMaxRetry            = 5
-	defaultConsumedCacheTTL    = 8 * time.Second
-	defaultConsumedCacheSize   = 1024
 	defaultPublishingCacheTTL  = 60 * time.Second
 	defaultPublishingCacheSize = 128
 	defaultMode                = Release
@@ -41,12 +39,6 @@ type clientOptions struct {
 	// maxRetry will define the number of retries when an amqpMessage could not be processed.
 	maxRetry uint
 
-	// consumedCacheTTL defines the time to live for each consumed cache item.
-	consumedCacheTTL time.Duration
-
-	// consumedCacheSize defines the max length of the consumed cache.
-	consumedCacheSize uint64
-
 	// publishingCacheTTL defines the time to live for each publishing cache item.
 	publishingCacheTTL time.Duration
 
@@ -67,8 +59,6 @@ func DefaultClientOptions() *clientOptions {
 		keepAlive:           defaultKeepAlive,
 		retryDelay:          defaultRetryDelay,
 		maxRetry:            defaultMaxRetry,
-		consumedCacheTTL:    defaultConsumedCacheTTL,
-		consumedCacheSize:   defaultConsumedCacheSize,
 		publishingCacheTTL:  defaultPublishingCacheTTL,
 		publishingCacheSize: defaultPublishingCacheSize,
 		mode:                defaultMode,
@@ -120,20 +110,6 @@ func (c *clientOptions) SetRetryDelay(delay time.Duration) *clientOptions {
 // SetMaxRetry will assign the max retry count.
 func (c *clientOptions) SetMaxRetry(retry uint) *clientOptions {
 	c.maxRetry = retry
-
-	return c
-}
-
-// SetConsumedCacheTTL will assign the consumed cache item TTL.
-func (c *clientOptions) SetConsumedCacheTTL(ttl time.Duration) *clientOptions {
-	c.consumedCacheTTL = ttl
-
-	return c
-}
-
-// SetConsumedCacheSize will assign the consumed cache max length.
-func (c *clientOptions) SetConsumedCacheSize(size uint64) *clientOptions {
-	c.consumedCacheSize = size
 
 	return c
 }
