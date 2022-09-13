@@ -277,7 +277,7 @@ func (a *amqpConnection) registerConsumer(consumer MessageConsumer) error {
 		}
 	}
 
-	channel := newConsumerChannel(a.ctx, a.connection, a.keepAlive, a.retryDelay, &consumer)
+	channel := newConsumerChannel(a.ctx, a.connection, a.keepAlive, a.retryDelay, &consumer, a.logger)
 
 	a.channels = append(a.channels, channel)
 
@@ -287,7 +287,7 @@ func (a *amqpConnection) registerConsumer(consumer MessageConsumer) error {
 func (a *amqpConnection) publish(exchange, routingKey string, payload []byte, options *publishingOptions) error {
 	publishingChannel := a.channels.publishingChannel()
 	if publishingChannel == nil {
-		publishingChannel = newPublishingChannel(a.ctx, a.connection, a.keepAlive, a.retryDelay, a.maxRetry, a.publishingCacheSize, a.publishingCacheTTL)
+		publishingChannel = newPublishingChannel(a.ctx, a.connection, a.keepAlive, a.retryDelay, a.maxRetry, a.publishingCacheSize, a.publishingCacheTTL, a.logger)
 
 		a.channels = append(a.channels, publishingChannel)
 	}

@@ -62,6 +62,9 @@ type amqpChannel struct {
 	// closed is an inner property that switches to true if the channel was explicitly closed.
 	closed bool
 
+	// logger logs events.
+	logger Logger
+
 	// connectionType defines the ConnectionType.
 	connectionType ConnectionType
 }
@@ -73,8 +76,8 @@ type amqpChannel struct {
 //   - retryDelay defines the delay between each retry, if the keepAlive flag is set to true.
 //   - consumer is the MessageConsumer that will hold consumption information.
 //   - maxRetry is the retry header for each message.
-func newConsumerChannel(ctx context.Context, connection *amqp.Connection, keepAlive bool, retryDelay time.Duration, consumer *MessageConsumer) *amqpChannel {
-	channel := newChannel(ctx, connection, keepAlive, retryDelay, Consumer)
+func newConsumerChannel(ctx context.Context, connection *amqp.Connection, keepAlive bool, retryDelay time.Duration, consumer *MessageConsumer, logger Logger) *amqpChannel {
+	channel := newChannel(ctx, connection, keepAlive, retryDelay, logger, Consumer)
 
 	channel.consumptionHealth = make(consumptionHealth)
 
@@ -92,8 +95,8 @@ func newConsumerChannel(ctx context.Context, connection *amqp.Connection, keepAl
 //   - retryDelay defines the delay between each retry, if the keepAlive flag is set to true.
 //   - consumer is the MessageConsumer that will hold consumption information.
 //   - maxRetry is the retry header for each message.
-func newPublishingChannel(ctx context.Context, connection *amqp.Connection, keepAlive bool, retryDelay time.Duration, maxRetry uint, publishingCacheSize uint64, publishingCacheTTL time.Duration) *amqpChannel {
-	channel := newChannel(ctx, connection, keepAlive, retryDelay, Publisher)
+func newPublishingChannel(ctx context.Context, connection *amqp.Connection, keepAlive bool, retryDelay time.Duration, maxRetry uint, publishingCacheSize uint64, publishingCacheTTL time.Duration, logger Logger) *amqpChannel {
+	channel := newChannel(ctx, connection, keepAlive, retryDelay, logger, Publisher)
 	channel.publishingCache = newTTLMap[string, mqttPublishing](publishingCacheSize, publishingCacheTTL)
 	channel.maxRetry = maxRetry
 
@@ -105,12 +108,13 @@ func newPublishingChannel(ctx context.Context, connection *amqp.Connection, keep
 //   - connection is the parent amqp.Connection.
 //   - keepAlive will keep the channel alive if true.
 //   - retryDelay defines the delay between each retry, if the keepAlive flag is set to true.
-func newChannel(ctx context.Context, connection *amqp.Connection, keepAlive bool, retryDelay time.Duration, connectionType ConnectionType) *amqpChannel {
+func newChannel(ctx context.Context, connection *amqp.Connection, keepAlive bool, retryDelay time.Duration, logger Logger, connectionType ConnectionType) *amqpChannel {
 	channel := &amqpChannel{
 		ctx:            ctx,
 		connection:     connection,
 		keepAlive:      keepAlive,
 		retryDelay:     retryDelay,
+		logger:         logger,
 		connectionType: connectionType,
 	}
 
