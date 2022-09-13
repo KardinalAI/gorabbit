@@ -150,7 +150,7 @@ func (c *amqpChannel) open() error {
 
 	c.onChannelOpened()
 
-	// If the keepAlive flag is set to true but no guard is active, we activate a new guard.
+	// If the keepAlive flag is set to true, we activate a new guard.
 	if c.keepAlive {
 		go c.guard()
 	}
@@ -275,7 +275,7 @@ func (c *amqpChannel) onChannelClosed() {
 // getID returns a unique identifier for the channel.
 func (c *amqpChannel) getID() string {
 	if c.consumer == nil {
-		return fmt.Sprintf("%s", uuid.NewString())
+		return fmt.Sprintf("publisher_%s", uuid.NewString())
 	}
 
 	return fmt.Sprintf("%s_%s", c.consumer.Name, uuid.NewString())
@@ -311,9 +311,37 @@ func (c *amqpChannel) consume() {
 
 			if handler, found := c.consumer.Handlers[message.RoutingKey]; found {
 				err = handler(message.Body)
+
+				c.processHandlerResult(&message, err)
 			}
 		}
 	}
+}
+
+// processHandlerResult is the logic that defines what to do with a processed message and its error.
+func (c *amqpChannel) processHandlerResult(message *amqp.Delivery, err error) {
+	// If the AutoAck flag is true, nothing is left to do.
+	if c.consumer.AutoAck {
+		return
+	}
+
+	// If there is no error, we can simply acknowledge the message.
+	if err == nil {
+		_ = message.Ack(false)
+
+		return
+	}
+
+	// TODO(Alex): For the retry mechanism, we should not use the maxRetry value, but the max retry header instead
+	// If the mexRetry value is greater than 0, we negative acknowledge the message with requeue.
+	if c.maxRetry > 0 {
+		_ = message.Nack(false, true)
+
+		return
+	}
+
+	// Otherwise, we negative acknowledge the message without requeue.
+	_ = message.Nack(false, false)
 }
 
 // publish will publish a message with the given configuration.

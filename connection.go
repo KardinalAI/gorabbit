@@ -122,7 +122,7 @@ func (a *amqpConnection) open() error {
 
 	a.channels.updateParentConnection(a.connection)
 
-	// If the keepAlive flag is set to true but no guard is active, we activate a new guard.
+	// If the keepAlive flag is set to true, we activate a new guard.
 	if a.keepAlive {
 		go a.guard()
 	}
