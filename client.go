@@ -6,8 +6,6 @@ import (
 	"os"
 )
 
-var consumed *ttlMap[uint64, interface{}]
-
 type MQTTClient interface {
 	// Disconnect launches the disconnection process.
 	// This operation disables to client permanently.
@@ -66,9 +64,11 @@ type MQTTClient interface {
 	//// Returns an error if the connection to the RabbitMQ server is down or the exchange does not exist.
 	// DeleteExchange(exchange string) error
 
-	// ReadyCheck returns true if the client is fully operational, connected to the RabbitMQ and have all its consumptionHealth up.
-	// Returns false if one of the above failed.
-	ReadyCheck() bool
+	// IsReady returns true if the client is fully operational and connected to the RabbitMQ.
+	IsReady() bool
+
+	// IsHealthy returns true if the client is ready (IsReady) and all channels are operating successfully.
+	IsHealthy() bool
 }
 
 type mqttClient struct {
@@ -154,11 +154,6 @@ func NewClient(options *clientOptions) MQTTClient {
 		options.publishingCacheTTL,
 		client.logger,
 	)
-
-	// If the consumed cache is not present, we instantiate it.
-	if consumed == nil {
-		consumed = newTTLMap[uint64, interface{}](options.consumedCacheSize, options.consumedCacheTTL)
-	}
 
 	return client
 }
@@ -368,11 +363,20 @@ func (client *mqttClient) Disconnect() error {
 //	return client.connectionManager.ExchangeDelete(exchange, false, false)
 //}
 
-func (client *mqttClient) ReadyCheck() bool {
+func (client *mqttClient) IsReady() bool {
 	// client is disabled, so we do nothing and return true.
 	if client.disabled {
 		return true
 	}
 
-	return client.connectionManager.isReady() && client.connectionManager.isHealthy()
+	return client.connectionManager.isReady()
+}
+
+func (client *mqttClient) IsHealthy() bool {
+	// client is disabled, so we do nothing and return true.
+	if client.disabled {
+		return true
+	}
+
+	return client.connectionManager.isHealthy()
 }

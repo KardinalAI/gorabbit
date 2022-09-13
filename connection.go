@@ -46,7 +46,7 @@ type amqpConnection struct {
 	connectionType ConnectionType
 }
 
-// newConsumerConnection initializes a new consumerConnection amqpConnection with given arguments.
+// newConsumerConnection initializes a new consumer amqpConnection with given arguments.
 //   - ctx is the parent context.
 //   - uri is the connection string.
 //   - keepAlive will keep the connection alive if true.
@@ -56,7 +56,7 @@ func newConsumerConnection(ctx context.Context, uri string, keepAlive bool, retr
 	return newConnection(ctx, uri, keepAlive, retryDelay, logger, Consumer)
 }
 
-// newPublishingConnection initializes a new publisherConnection amqpConnection with given arguments.
+// newPublishingConnection initializes a new publisher amqpConnection with given arguments.
 //   - ctx is the parent context.
 //   - uri is the connection string.
 //   - keepAlive will keep the connection alive if true.
@@ -216,12 +216,12 @@ func (a *amqpConnection) ready() bool {
 
 // healthy returns true of the connection exists, is not closed and all child channels are healthy.
 func (a *amqpConnection) healthy() bool {
-	// If the consumerConnection is not ready, return false.
+	// If the connection is not ready, return false.
 	if !a.ready() {
 		return false
 	}
 
-	// Verify that all consumerConnection channels are ready too.
+	// Verify that all connection channels are ready too.
 	for _, channel := range a.channels {
 		if !channel.healthy() {
 			return false

@@ -66,7 +66,7 @@ func (c *connectionManager) isHealthy() bool {
 // registerConsumer registers a new MessageConsumer.
 func (c *connectionManager) registerConsumer(consumer MessageConsumer) error {
 	if c.consumerConnection == nil {
-		return errConsumerNotInitialized
+		return errConsumerConnectionNotInitialized
 	}
 
 	return c.consumerConnection.registerConsumer(consumer)
@@ -74,7 +74,7 @@ func (c *connectionManager) registerConsumer(consumer MessageConsumer) error {
 
 func (c *connectionManager) publish(exchange, routingKey string, payload interface{}, options *publishingOptions) error {
 	if c.publisherConnection == nil {
-		return errPublisherNotInitialized
+		return errPublisherConnectionNotInitialized
 	}
 
 	payloadBytes, err := json.Marshal(payload)

@@ -12,8 +12,8 @@ const (
 type ConnectionType string
 
 const (
-	Consumer  ConnectionType = "consumerConnection"
-	Publisher ConnectionType = "publisherConnection"
+	Consumer  ConnectionType = "consumer"
+	Publisher ConnectionType = "publisher"
 )
 
 // Priority Levels.
@@ -58,11 +58,10 @@ func isValidMode(mode string) bool {
 
 // Errors.
 var (
-	errEmptyURI                = errors.New("amqp uri is empty")
-	errDeliveryNotInitialized  = errors.New("delivery not initialized")
-	errConnectionClosed        = errors.New("connection is closed")
-	errChannelClosed           = errors.New("channel is closed")
-	errConsumerAlreadyExists   = errors.New("consumerConnection already exists")
-	errConsumerNotInitialized  = errors.New("consumerConnection is not initialized")
-	errPublisherNotInitialized = errors.New("publisherConnection is not initialized")
+	errEmptyURI                          = errors.New("amqp uri is empty")
+	errConnectionClosed                  = errors.New("connection is closed")
+	errChannelClosed                     = errors.New("channel is closed")
+	errConsumerAlreadyExists             = errors.New("consumer already exists")
+	errConsumerConnectionNotInitialized  = errors.New("consumerConnection is not initialized")
+	errPublisherConnectionNotInitialized = errors.New("publisherConnection is not initialized")
 )
