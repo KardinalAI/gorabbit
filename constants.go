@@ -3,8 +3,7 @@ package gorabbit
 import "errors"
 
 const (
-	RedeliveryHeader = "x-redelivered-count"
-	MaxRetryHeader   = "x-death"
+	MaxRetryHeader = "x-death-count"
 )
 
 // Connection Types.

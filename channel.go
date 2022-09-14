@@ -10,8 +10,10 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+// amqpChannels is a simple wrapper of an amqpChannel slice.
 type amqpChannels []*amqpChannel
 
+// publishingChannel loops through all channels and returns the first available publisher channel if it exists.
 func (a amqpChannels) publishingChannel() *amqpChannel {
 	for _, channel := range a {
 		if channel != nil && channel.connectionType == Publisher {
@@ -22,6 +24,7 @@ func (a amqpChannels) publishingChannel() *amqpChannel {
 	return nil
 }
 
+// updateParentConnection updates every channel's parent connection.
 func (a amqpChannels) updateParentConnection(conn *amqp.Connection) {
 	for _, channel := range a {
 		channel.connection = conn
@@ -332,10 +335,45 @@ func (c *amqpChannel) processHandlerResult(message *amqp.Delivery, err error) {
 		return
 	}
 
-	// TODO(Alex): For the retry mechanism, we should not use the maxRetry value, but the max retry header instead
-	// If the mexRetry value is greater than 0, we negative acknowledge the message with requeue.
-	if c.maxRetry > 0 {
-		_ = message.Nack(false, true)
+	// We first extract the MaxRetryHeader.
+	maxRetryHeader, exists := message.Headers[MaxRetryHeader]
+
+	// If the header doesn't exist, we negative acknowledge the message without requeue.
+	if !exists {
+		_ = message.Nack(false, false)
+
+		return
+	}
+
+	// We then cast the value as an int32. If the operation fails, we negative acknowledge the message without requeue.
+	retriesCount, ok := maxRetryHeader.(int32)
+	if !ok {
+		_ = message.Nack(false, false)
+
+		return
+	}
+
+	// If the retries count is still greater than 0, we re-publish the message with a decremented MaxRetryHeader.
+	if retriesCount > 0 {
+		// We first negative acknowledge the existing message to remove it from queue.
+		_ = message.Nack(false, false)
+
+		// We create a new publishing which is a copy of the old one but with a decremented MaxRetryHeader.
+		newPublishing := amqp.Publishing{
+			ContentType:  "text/plain",
+			Body:         message.Body,
+			Type:         message.RoutingKey,
+			Priority:     message.Priority,
+			DeliveryMode: message.DeliveryMode,
+			MessageId:    message.MessageId,
+			Timestamp:    message.Timestamp,
+			Headers: map[string]interface{}{
+				MaxRetryHeader: int(retriesCount - 1),
+			},
+		}
+
+		// We work on a best-effort basis. We try to re-publish the message, but we do nothing if it fails.
+		_ = c.channel.PublishWithContext(c.ctx, message.Exchange, message.RoutingKey, false, false, newPublishing)
 
 		return
 	}
