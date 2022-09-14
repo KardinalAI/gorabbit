@@ -286,6 +286,7 @@ func (c *amqpChannel) getID() string {
 
 // consume handles the consumption mechanism.
 func (c *amqpChannel) consume() {
+	// TODO(Alex): Double check why setting a prefetch size greater than 0 causes an error
 	// Set the QOS, which defines how many messages can be processed at the same time.
 	err := c.channel.Qos(c.consumer.PrefetchCount, c.consumer.PrefetchSize, false)
 	if err != nil {
@@ -364,7 +365,7 @@ func (c *amqpChannel) processDelivery(delivery *amqp.Delivery) {
 }
 
 // retryDelivery processes a delivery retry based on its redelivery header.
-func (c *amqpChannel) retryDelivery(delivery *amqp.Delivery, autoAck bool) {
+func (c *amqpChannel) retryDelivery(delivery *amqp.Delivery, alreadyAcknowledged bool) {
 	for {
 		select {
 		case <-c.consumptionCtx.Done():
@@ -379,7 +380,7 @@ func (c *amqpChannel) retryDelivery(delivery *amqp.Delivery, autoAck bool) {
 			// If the header doesn't exist.
 			if !exists {
 				// We negative acknowledge the delivery without requeue if the autoAck flag is set to false.
-				if !autoAck {
+				if !alreadyAcknowledged {
 					_ = delivery.Nack(false, false)
 				}
 
@@ -391,7 +392,7 @@ func (c *amqpChannel) retryDelivery(delivery *amqp.Delivery, autoAck bool) {
 
 			// If the casting fails,we negative acknowledge the delivery without requeue if the autoAck flag is set to false.
 			if !ok {
-				if !autoAck {
+				if !alreadyAcknowledged {
 					_ = delivery.Nack(false, false)
 				}
 
@@ -401,7 +402,7 @@ func (c *amqpChannel) retryDelivery(delivery *amqp.Delivery, autoAck bool) {
 			// If the retries count is still greater than 0, we re-publish the delivery with a decremented MaxRetryHeader.
 			if retriesCount > 0 {
 				// We first negative acknowledge the existing delivery to remove it from queue if the autoAck flag is set to false.
-				if !autoAck {
+				if !alreadyAcknowledged {
 					_ = delivery.Nack(false, false)
 				}
 
@@ -426,7 +427,7 @@ func (c *amqpChannel) retryDelivery(delivery *amqp.Delivery, autoAck bool) {
 			}
 
 			// Otherwise, we negative acknowledge the delivery without requeue if the autoAck flag is set to false.
-			if !autoAck {
+			if !alreadyAcknowledged {
 				_ = delivery.Nack(false, false)
 			}
 
