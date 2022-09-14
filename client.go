@@ -6,6 +6,11 @@ import (
 	"os"
 )
 
+// MQTTClient is a simple MQTT interface that offers basic client operations such as:
+// 	 - Publishing
+//   - Consuming
+//   - Disconnecting
+//   - Ready and health checks
 type MQTTClient interface {
 	// Disconnect launches the disconnection process.
 	// This operation disables to client permanently.

@@ -293,7 +293,7 @@ func (c *amqpChannel) consume() {
 		return
 	}
 
-	messages, err := c.channel.Consume(c.consumer.Queue, c.getID(), c.consumer.AutoAck, false, false, false, nil)
+	deliveries, err := c.channel.Consume(c.consumer.Queue, c.getID(), c.consumer.AutoAck, false, false, false, nil)
 
 	c.consumptionHealth.AddSubscription(c.consumer.Queue, err)
 
@@ -306,80 +306,121 @@ func (c *amqpChannel) consume() {
 		select {
 		case <-c.consumptionCtx.Done():
 			return
-		case message := <-messages:
-			// When a queue is deleted midway, a message with no delivery tag or ID is received.
-			if message.DeliveryTag == 0 && message.MessageId == "" {
+		case delivery := <-deliveries:
+			// When a queue is deleted midway, a delivery with no tag or ID is received.
+			if delivery.DeliveryTag == 0 && delivery.MessageId == "" {
 				return
 			}
 
-			if handler, found := c.consumer.Handlers[message.RoutingKey]; found {
-				err = handler(message.Body)
+			// We copy the delivery for the concurrent process of it (otherwise we may process the wrong delivery
+			// if a new one is consumed while the previous is still being processed).
+			loopDelivery := delivery
 
-				c.processHandlerResult(&message, err)
+			if c.consumer.ConcurrentProcess {
+				// We process the message asynchronously if the concurrency is set to true.
+				go c.processDelivery(&loopDelivery)
+			} else {
+				// Otherwise, we process the message synchronously.
+				c.processDelivery(&loopDelivery)
 			}
 		}
 	}
 }
 
-// processHandlerResult is the logic that defines what to do with a processed message and its error.
-func (c *amqpChannel) processHandlerResult(message *amqp.Delivery, err error) {
-	// If the AutoAck flag is true, nothing is left to do.
+// processDelivery is the logic that defines what to do with a processed delivery and its error.
+func (c *amqpChannel) processDelivery(delivery *amqp.Delivery) {
+	handler, found := c.consumer.Handlers[delivery.RoutingKey]
+
+	// If the handler doesn't exist for the received delivery, we negative acknowledge it without requeue.
+	if !found {
+		// If the consumer is not set to auto acknowledge the delivery, we negative acknowledge it without requeue.
+		if !c.consumer.AutoAck {
+			_ = delivery.Nack(false, false)
+		}
+
+		return
+	}
+
+	err := handler(delivery.Body)
+
+	// If the consumer has the autoAck flag activated, we want to retry the delivery in case of an error.
 	if c.consumer.AutoAck {
+		if err != nil {
+			c.retryDelivery(delivery, true)
+		}
+
 		return
 	}
 
-	// If there is no error, we can simply acknowledge the message.
+	// If there is no error, we can simply acknowledge the delivery.
 	if err == nil {
-		_ = message.Ack(false)
+		_ = delivery.Ack(false)
 
 		return
 	}
 
+	// Otherwise we retry the delivery.
+	c.retryDelivery(delivery, false)
+}
+
+// retryDelivery processes a delivery retry based on its redelivery header.
+func (c *amqpChannel) retryDelivery(delivery *amqp.Delivery, autoAck bool) {
 	// We first extract the MaxRetryHeader.
-	maxRetryHeader, exists := message.Headers[MaxRetryHeader]
+	maxRetryHeader, exists := delivery.Headers[MaxRetryHeader]
 
-	// If the header doesn't exist, we negative acknowledge the message without requeue.
+	// If the header doesn't exist.
 	if !exists {
-		_ = message.Nack(false, false)
+		// We negative acknowledge the delivery without requeue if the autoAck flag is set to false.
+		if !autoAck {
+			_ = delivery.Nack(false, false)
+		}
 
 		return
 	}
 
-	// We then cast the value as an int32. If the operation fails, we negative acknowledge the message without requeue.
+	// We then cast the value as an int32.
 	retriesCount, ok := maxRetryHeader.(int32)
+
+	// If the casting fails,we negative acknowledge the delivery without requeue if the autoAck flag is set to false.
 	if !ok {
-		_ = message.Nack(false, false)
+		if !autoAck {
+			_ = delivery.Nack(false, false)
+		}
 
 		return
 	}
 
-	// If the retries count is still greater than 0, we re-publish the message with a decremented MaxRetryHeader.
+	// If the retries count is still greater than 0, we re-publish the delivery with a decremented MaxRetryHeader.
 	if retriesCount > 0 {
-		// We first negative acknowledge the existing message to remove it from queue.
-		_ = message.Nack(false, false)
+		// We first negative acknowledge the existing delivery to remove it from queue if the autoAck flag is set to false.
+		if !autoAck {
+			_ = delivery.Nack(false, false)
+		}
 
 		// We create a new publishing which is a copy of the old one but with a decremented MaxRetryHeader.
 		newPublishing := amqp.Publishing{
 			ContentType:  "text/plain",
-			Body:         message.Body,
-			Type:         message.RoutingKey,
-			Priority:     message.Priority,
-			DeliveryMode: message.DeliveryMode,
-			MessageId:    message.MessageId,
-			Timestamp:    message.Timestamp,
+			Body:         delivery.Body,
+			Type:         delivery.RoutingKey,
+			Priority:     delivery.Priority,
+			DeliveryMode: delivery.DeliveryMode,
+			MessageId:    delivery.MessageId,
+			Timestamp:    delivery.Timestamp,
 			Headers: map[string]interface{}{
 				MaxRetryHeader: int(retriesCount - 1),
 			},
 		}
 
-		// We work on a best-effort basis. We try to re-publish the message, but we do nothing if it fails.
-		_ = c.channel.PublishWithContext(c.ctx, message.Exchange, message.RoutingKey, false, false, newPublishing)
+		// We work on a best-effort basis. We try to re-publish the delivery, but we do nothing if it fails.
+		_ = c.channel.PublishWithContext(c.ctx, delivery.Exchange, delivery.RoutingKey, false, false, newPublishing)
 
 		return
 	}
 
-	// Otherwise, we negative acknowledge the message without requeue.
-	_ = message.Nack(false, false)
+	// Otherwise, we negative acknowledge the delivery without requeue if the autoAck flag is set to false.
+	if !autoAck {
+		_ = delivery.Nack(false, false)
+	}
 }
 
 // publish will publish a message with the given configuration.
