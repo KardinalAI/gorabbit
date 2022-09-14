@@ -346,7 +346,7 @@ func (c *amqpChannel) processDelivery(delivery *amqp.Delivery) {
 	// If the consumer has the autoAck flag activated, we want to retry the delivery in case of an error.
 	if c.consumer.AutoAck {
 		if err != nil {
-			c.retryDelivery(delivery, true)
+			go c.retryDelivery(delivery, true)
 		}
 
 		return
@@ -360,66 +360,78 @@ func (c *amqpChannel) processDelivery(delivery *amqp.Delivery) {
 	}
 
 	// Otherwise we retry the delivery.
-	c.retryDelivery(delivery, false)
+	go c.retryDelivery(delivery, false)
 }
 
 // retryDelivery processes a delivery retry based on its redelivery header.
 func (c *amqpChannel) retryDelivery(delivery *amqp.Delivery, autoAck bool) {
-	// We first extract the MaxRetryHeader.
-	maxRetryHeader, exists := delivery.Headers[MaxRetryHeader]
+	for {
+		select {
+		case <-c.consumptionCtx.Done():
+			return
+		default:
+			// We wait for the retry delay before retrying a message.
+			time.Sleep(c.retryDelay)
 
-	// If the header doesn't exist.
-	if !exists {
-		// We negative acknowledge the delivery without requeue if the autoAck flag is set to false.
-		if !autoAck {
-			_ = delivery.Nack(false, false)
+			// We first extract the MaxRetryHeader.
+			maxRetryHeader, exists := delivery.Headers[MaxRetryHeader]
+
+			// If the header doesn't exist.
+			if !exists {
+				// We negative acknowledge the delivery without requeue if the autoAck flag is set to false.
+				if !autoAck {
+					_ = delivery.Nack(false, false)
+				}
+
+				return
+			}
+
+			// We then cast the value as an int32.
+			retriesCount, ok := maxRetryHeader.(int32)
+
+			// If the casting fails,we negative acknowledge the delivery without requeue if the autoAck flag is set to false.
+			if !ok {
+				if !autoAck {
+					_ = delivery.Nack(false, false)
+				}
+
+				return
+			}
+
+			// If the retries count is still greater than 0, we re-publish the delivery with a decremented MaxRetryHeader.
+			if retriesCount > 0 {
+				// We first negative acknowledge the existing delivery to remove it from queue if the autoAck flag is set to false.
+				if !autoAck {
+					_ = delivery.Nack(false, false)
+				}
+
+				// We create a new publishing which is a copy of the old one but with a decremented MaxRetryHeader.
+				newPublishing := amqp.Publishing{
+					ContentType:  "text/plain",
+					Body:         delivery.Body,
+					Type:         delivery.RoutingKey,
+					Priority:     delivery.Priority,
+					DeliveryMode: delivery.DeliveryMode,
+					MessageId:    delivery.MessageId,
+					Timestamp:    delivery.Timestamp,
+					Headers: map[string]interface{}{
+						MaxRetryHeader: int(retriesCount - 1),
+					},
+				}
+
+				// We work on a best-effort basis. We try to re-publish the delivery, but we do nothing if it fails.
+				_ = c.channel.PublishWithContext(c.ctx, delivery.Exchange, delivery.RoutingKey, false, false, newPublishing)
+
+				return
+			}
+
+			// Otherwise, we negative acknowledge the delivery without requeue if the autoAck flag is set to false.
+			if !autoAck {
+				_ = delivery.Nack(false, false)
+			}
+
+			return
 		}
-
-		return
-	}
-
-	// We then cast the value as an int32.
-	retriesCount, ok := maxRetryHeader.(int32)
-
-	// If the casting fails,we negative acknowledge the delivery without requeue if the autoAck flag is set to false.
-	if !ok {
-		if !autoAck {
-			_ = delivery.Nack(false, false)
-		}
-
-		return
-	}
-
-	// If the retries count is still greater than 0, we re-publish the delivery with a decremented MaxRetryHeader.
-	if retriesCount > 0 {
-		// We first negative acknowledge the existing delivery to remove it from queue if the autoAck flag is set to false.
-		if !autoAck {
-			_ = delivery.Nack(false, false)
-		}
-
-		// We create a new publishing which is a copy of the old one but with a decremented MaxRetryHeader.
-		newPublishing := amqp.Publishing{
-			ContentType:  "text/plain",
-			Body:         delivery.Body,
-			Type:         delivery.RoutingKey,
-			Priority:     delivery.Priority,
-			DeliveryMode: delivery.DeliveryMode,
-			MessageId:    delivery.MessageId,
-			Timestamp:    delivery.Timestamp,
-			Headers: map[string]interface{}{
-				MaxRetryHeader: int(retriesCount - 1),
-			},
-		}
-
-		// We work on a best-effort basis. We try to re-publish the delivery, but we do nothing if it fails.
-		_ = c.channel.PublishWithContext(c.ctx, delivery.Exchange, delivery.RoutingKey, false, false, newPublishing)
-
-		return
-	}
-
-	// Otherwise, we negative acknowledge the delivery without requeue if the autoAck flag is set to false.
-	if !autoAck {
-		_ = delivery.Nack(false, false)
 	}
 }
 
