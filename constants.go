@@ -1,6 +1,23 @@
 package gorabbit
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
+
+// Default values for the ClientOptions and ManagerOptions.
+const (
+	defaultHost                = "127.0.0.1"
+	defaultPort                = 5672
+	defaultUsername            = "guest"
+	defaultPassword            = "guest"
+	defaultKeepAlive           = true
+	defaultRetryDelay          = 3 * time.Second
+	defaultMaxRetry            = 5
+	defaultPublishingCacheTTL  = 60 * time.Second
+	defaultPublishingCacheSize = 128
+	defaultMode                = Release
+)
 
 const (
 	MaxRetryHeader = "x-death-count"
@@ -58,8 +75,10 @@ func isValidMode(mode string) bool {
 // Errors.
 var (
 	errEmptyURI                          = errors.New("amqp uri is empty")
+	errChannelClosed                     = errors.New("channel is closed")
 	errConnectionClosed                  = errors.New("connection is closed")
 	errConsumerAlreadyExists             = errors.New("consumer already exists")
 	errConsumerConnectionNotInitialized  = errors.New("consumerConnection is not initialized")
 	errPublisherConnectionNotInitialized = errors.New("publisherConnection is not initialized")
+	errEmptyQueue                        = errors.New("queue is empty")
 )

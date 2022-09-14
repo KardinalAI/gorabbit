@@ -2,22 +2,8 @@ package gorabbit
 
 import "time"
 
-// Default values for the clientOptions.
-const (
-	defaultHost                = "127.0.0.1"
-	defaultPort                = 5672
-	defaultUsername            = "guest"
-	defaultPassword            = "guest"
-	defaultKeepAlive           = true
-	defaultRetryDelay          = 3 * time.Second
-	defaultMaxRetry            = 5
-	defaultPublishingCacheTTL  = 60 * time.Second
-	defaultPublishingCacheSize = 128
-	defaultMode                = Release
-)
-
-// clientOptions is an unexported type that holds all necessary properties to launch a successful connection with an MQTTClient.
-type clientOptions struct {
+// ClientOptions holds all necessary properties to launch a successful connection with an MQTTClient.
+type ClientOptions struct {
 	// host is the RabbitMQ server host name.
 	host string
 
@@ -49,9 +35,9 @@ type clientOptions struct {
 	mode string
 }
 
-// DefaultClientOptions will return a clientOptions with default values.
-func DefaultClientOptions() *clientOptions {
-	return &clientOptions{
+// DefaultClientOptions will return a ClientOptions with default values.
+func DefaultClientOptions() *ClientOptions {
+	return &ClientOptions{
 		host:                defaultHost,
 		port:                defaultPort,
 		username:            defaultUsername,
@@ -65,28 +51,28 @@ func DefaultClientOptions() *clientOptions {
 	}
 }
 
-// NewClientOptions is the exported builder for a clientOptions and will offer setter methods for an easy construction.
+// NewClientOptions is the exported builder for a ClientOptions and will offer setter methods for an easy construction.
 // Any non-assigned field will be set to default through DefaultClientOptions.
-func NewClientOptions() *clientOptions {
+func NewClientOptions() *ClientOptions {
 	return DefaultClientOptions()
 }
 
 // SetHost will assign the host.
-func (c *clientOptions) SetHost(host string) *clientOptions {
+func (c *ClientOptions) SetHost(host string) *ClientOptions {
 	c.host = host
 
 	return c
 }
 
 // SetPort will assign the port.
-func (c *clientOptions) SetPort(port uint) *clientOptions {
+func (c *ClientOptions) SetPort(port uint) *ClientOptions {
 	c.port = port
 
 	return c
 }
 
 // SetCredentials will assign the username and password.
-func (c *clientOptions) SetCredentials(username, password string) *clientOptions {
+func (c *ClientOptions) SetCredentials(username, password string) *ClientOptions {
 	c.username = username
 	c.password = password
 
@@ -94,42 +80,42 @@ func (c *clientOptions) SetCredentials(username, password string) *clientOptions
 }
 
 // SetKeepAlive will assign the keepAlive status.
-func (c *clientOptions) SetKeepAlive(keepAlive bool) *clientOptions {
+func (c *ClientOptions) SetKeepAlive(keepAlive bool) *ClientOptions {
 	c.keepAlive = keepAlive
 
 	return c
 }
 
 // SetRetryDelay will assign the retry delay.
-func (c *clientOptions) SetRetryDelay(delay time.Duration) *clientOptions {
+func (c *ClientOptions) SetRetryDelay(delay time.Duration) *ClientOptions {
 	c.retryDelay = delay
 
 	return c
 }
 
 // SetMaxRetry will assign the max retry count.
-func (c *clientOptions) SetMaxRetry(retry uint) *clientOptions {
+func (c *ClientOptions) SetMaxRetry(retry uint) *ClientOptions {
 	c.maxRetry = retry
 
 	return c
 }
 
 // SetPublishingCacheTTL will assign the publishing cache item TTL.
-func (c *clientOptions) SetPublishingCacheTTL(ttl time.Duration) *clientOptions {
+func (c *ClientOptions) SetPublishingCacheTTL(ttl time.Duration) *ClientOptions {
 	c.publishingCacheTTL = ttl
 
 	return c
 }
 
 // SetPublishingCacheSize will assign the publishing cache max length.
-func (c *clientOptions) SetPublishingCacheSize(size uint64) *clientOptions {
+func (c *ClientOptions) SetPublishingCacheSize(size uint64) *ClientOptions {
 	c.publishingCacheSize = size
 
 	return c
 }
 
 // SetMode will assign the mode if valid.
-func (c *clientOptions) SetMode(mode string) *clientOptions {
+func (c *ClientOptions) SetMode(mode string) *ClientOptions {
 	if isValidMode(mode) {
 		c.mode = mode
 	}

@@ -22,10 +22,6 @@ type BindingConfig struct {
 	Exchange   string `yaml:"exchange"`
 }
 
-type amqpDelivery struct {
-	amqp.Delivery
-}
-
 type publishingOptions struct {
 	messagePriority *MessagePriority
 	deliveryMode    *DeliveryMode
