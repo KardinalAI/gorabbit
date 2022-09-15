@@ -5,16 +5,18 @@ import (
 )
 
 type ExchangeConfig struct {
-	Name      string       `yaml:"name"`
-	Type      ExchangeType `yaml:"type"`
-	Persisted bool         `yaml:"persisted"`
+	Name      string                 `yaml:"name"`
+	Type      ExchangeType           `yaml:"type"`
+	Persisted bool                   `yaml:"persisted"`
+	Args      map[string]interface{} `yaml:"args"`
 }
 
 type QueueConfig struct {
-	Name      string           `yaml:"name"`
-	Durable   bool             `yaml:"durable"`
-	Exclusive bool             `yaml:"exclusive"`
-	Bindings  *[]BindingConfig `yaml:"bindings"`
+	Name      string                 `yaml:"name"`
+	Durable   bool                   `yaml:"durable"`
+	Exclusive bool                   `yaml:"exclusive"`
+	Args      map[string]interface{} `yaml:"args"`
+	Bindings  *[]BindingConfig       `yaml:"bindings"`
 }
 
 type BindingConfig struct {

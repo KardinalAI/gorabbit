@@ -471,8 +471,8 @@ func (c *amqpChannel) publish(exchange string, routingKey string, payload []byte
 
 	err := c.channel.PublishWithContext(c.ctx, exchange, routingKey, false, false, *publishing)
 
-	// If the message could not be sent, we cache it until the channel is back up to publish it again.
-	if err != nil {
+	// If the message could not be sent and the keepAlive flag is set, we cache it until the channel is back up to publish it again.
+	if err != nil && c.keepAlive {
 		msg := mqttPublishing{
 			Exchange:   exchange,
 			RoutingKey: routingKey,

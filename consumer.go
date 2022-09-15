@@ -16,11 +16,11 @@ type MessageConsumer struct {
 	// Name is a unique identifier of the consumer. Should be as explicit as possible.
 	Name string
 
-	// PrefetchSize defines the mex number of messages that are allowed to be processed at the same time.
+	// PrefetchSize defines the mex size of messages that are allowed to be processed at the same time.
 	// This property is dropped if AutoAck is set to true.
 	PrefetchSize int
 
-	// PrefetchCount defines the mex size of messages that are allowed to be processed at the same time.
+	// PrefetchCount defines the mex number of messages that are allowed to be processed at the same time.
 	// This property is dropped if AutoAck is set to true.
 	PrefetchCount int
 

@@ -180,7 +180,7 @@ func (manager *mqttManager) CreateQueue(config QueueConfig) error {
 		false,            // delete when unused
 		config.Exclusive, // exclusive
 		false,            // no-wait
-		nil,
+		config.Args,
 	)
 
 	if err != nil {
@@ -220,7 +220,7 @@ func (manager *mqttManager) CreateExchange(config ExchangeConfig) error {
 		!config.Persisted,    // auto-deleted
 		false,                // internal
 		false,                // no-wait
-		nil,                  // arguments
+		config.Args,          // arguments
 	)
 }
 

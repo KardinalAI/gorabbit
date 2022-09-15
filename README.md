@@ -98,7 +98,7 @@ client := gorabbit.NewClient(options)
 
 #### Using struct initialization
 
-`ClientOptions` is an exported type so it can be used directly.
+`ClientOptions` is an exported type, so it can be used directly.
 
 ```go
 options := gorabbit.ClentOptions {
@@ -113,8 +113,7 @@ client := gorabbit.NewClient(&options)
 ```
 
 > :warning: Direct initialization via the struct **does not use default values on missing properties**, so be sure to
-> fill
-> in every property available.
+> fill in every property available.
 
 ### Environment Variables
 
@@ -172,6 +171,152 @@ options := gorabbit.SendOptions()
     .SetDeliveryMode(gorabbit.Persistent)
 
 err := client.PublishWithOptions("events_exchange", "event.foo.bar.created", "foo string", options)
+```
+
+> :information_source: If the `KeepAlive` flag is set to true when initializing the client, failed publishing will be cached once
+> and re-published as soon as the channel is back up.
+
+### Consuming
+
+To consume messages, gorabbit offers a very simple asynchronous consumer method `Consume` that takes a `MessageConsumer`
+as argument. Error handling, acknowledgement, negative acknowledgement and rejection are all done internally by the consumer.
+
+```go
+err := client.RegisterConsumer(gorabbit.MessageConsumer{
+	Queue:             "events_queue",
+	Name:              "toto_consumer",
+	PrefetchSize:      0,
+	PrefetchCount:     10,
+	AutoAck:           false,
+	ConcurrentProcess: false,
+	Handlers: gorabbit.MQTTMessageHandlers{
+		"event.toto": func(payload []byte) error {
+			fmt.Println(string(payload))
+				
+			return nil
+		},
+	},
+})
+```
+
+* Queue: The queue to consume messages from
+* Name: Unique identifier for the consumer
+* PrefetchSize: The maximum size of messages that can be processed at the same time
+* PrefetchCount: The maximum number of messages that can be processed at the same time
+* AutoAck: Automatic acknowledgement of messages upon reception
+* ConcurrentProcess: Asynchronous handling of deliveries
+* Handlers: A list of handlers for specified routes
+
+> :information_source: If the `KeepAlive` flag is set to true when initializing the client, consumers will auto-reconnect after a connection loss.
+> This mechanism is indefinite and therefore, consuming from a non-existent queue will trigger an error repeatedly but will not affect
+> other consumptions. This is because each consumer has its **own channel**.
+
+## Manager
+
+The gorabbit manager offers multiple management operations:
+
+* Exchange, queue and bindings creation
+* Exchange and queue deletion
+* Queue evaluation: Exists, number of messages
+* Queue operations: Pop message, push message, purge
+
+> :warning: A manager should only be used for either testing RabbitMQ functionalities or setting up a RabbitMQ server.
+> The manager does not provide robust mechanisms of retry and reconnection like the client.
+
+### Initialization
+
+A manager can be initialized via the constructor `NewManager`. This constructor takes `ManagerOptions` as an optional
+parameter.
+
+### Options
+
+| Property            | Description                                             | Default Value |
+|---------------------|---------------------------------------------------------|---------------|
+| Host                | The hostname of the RabbitMQ server                     | 127.0.0.1     |
+| Port                | The port of the RabbitMQ server                         | 5672          |
+| Username            | The plain authentication username                       | guest         |
+| Password            | The plain authentication password                       | guest         |
+| Mode                | The mode defines whether logs are shown or not          | Release       |
+
+### Manager with default options
+
+Passing `nil` options will trigger the manager to use default values (host, port, credentials, etc...)
+via `DefaultManagerOptions()`.
+
+```go
+manager := gorabbit.NewManager(nil)
+```
+
+You can also explicitly pass `DefaultManagerOptions()` for a cleaner initialization.
+
+```go
+manager := gorabbit.NewManager(gorabbit.DefaultManagerOptions())
+```
+
+Finally, passing a `NewManagerOptions()` method also initializes default values if not overwritten.
+
+```go
+manager := gorabbit.NewManager(gorabbit.NewManagerOptions())
+```
+
+### Manager with custom options
+
+We can input custom values for a specific property, either via the built-in builder or via direct struct initialization.
+
+#### Using the builder
+
+`NewManagerOptions()` and `DefaultManagerOptions()` both return an instance of `*ManagerOptions` that can act as a builder.
+
+```go
+options := gorabbit.NewManagerOptions()
+    .SetMode(gorabbit.Debug)
+    .SetCredentials("root", "password")
+
+manager := gorabbit.NewManager(options)
+```
+
+> :information_source: There is a setter method for each property.
+
+#### Using struct initialization
+
+`ManagerOptions` is an exported type, so it can be used directly.
+
+```go
+options := gorabbit.ManagerOptions {
+    Host:     "localhost",
+    Port:     5673,
+    Username: "root",
+    Password: "password"
+    Mode:     gorabbit.Debug
+}
+
+manager := gorabbit.NewManager(&options)
+```
+
+> :warning: Direct initialization via the struct **does not use default values on missing properties**, so be sure to
+> fill in every property available.
+
+### Environment Variables
+
+The manager's `Mode` can also be set via an environment variable that will **override** the manually entered value.
+
+```dotenv
+GORABBIT_MODE: debug    # possible values: release or debug
+```
+
+The manager can also be completely disabled via the following environment variable:
+
+```dotenv
+GORABBIT_DISABLED: true     # possible values: true, false, 1, or 0 
+```
+
+### Disconnection
+
+When a manager is initialized, to prevent a leak, always disconnect it when no longer needed.
+
+```go
+manager := gorabbit.NewManager(gorabbit.DefaultManagerOptions())
+defer manager.Disconnect()
 ```
 
 ## Launch Local RabbitMQ Server
