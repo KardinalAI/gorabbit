@@ -5,19 +5,19 @@ Gorabbit is a wrapper that provides high level and robust RabbitMQ operations th
 This wrapper depends on the official [Go RabbitMQ plugin](https://github.com/rabbitmq/amqp091-go).
 
 * [Installation](#installation)
-   * [Go Module](#go-module)
-   * [Issues](#possible-issues)
-   * [Environment Variables](#environment-variables)
+    * [Go Module](#go-module)
+    * [Issues](#possible-issues)
+    * [Environment Variables](#environment-variables)
 * [Client](#client)
-   * [Initialisation](#client-initialization) 
-   * [Options](#client-options)
-   * [Default Options](#client-with-default-options)
-   * [Custom Options](#client-with-custom-options)
-     * [Builder](#client-options-using-the-builder)
-     * [Struct](#client-options-using-struct-initialization)
-   * [Disconnection](#client-disconnection)
-   * [Publishing](#publishing)
-   * [Consuming](#consuming)
+    * [Initialisation](#client-initialization)
+    * [Options](#client-options)
+    * [Default Options](#client-with-default-options)
+    * [Custom Options](#client-with-custom-options)
+        * [Builder](#client-options-using-the-builder)
+        * [Struct](#client-options-using-struct-initialization)
+    * [Disconnection](#client-disconnection)
+    * [Publishing](#publishing)
+    * [Consuming](#consuming)
 * [Manager](#manager)
     * [Initialisation](#manager-initialization)
     * [Options](#manager-options)
@@ -26,8 +26,16 @@ This wrapper depends on the official [Go RabbitMQ plugin](https://github.com/rab
         * [Builder](#manager-options-using-the-builder)
         * [Struct](#manager-options-using-struct-initialization)
     * [Disconnection](#manager-disconnection)
-  
-  
+    * [Operations](#manager-operations)
+        * [Exchange Creation](#exchange-creation)
+        * [Queue Creation](#queue-creation)
+        * [Binding Creation](#binding-creation)
+        * [Message Count](#queue-messages-count)
+        * [Push Message](#push-message)
+        * [Pop Message](#pop-message)
+        * [Purge Queue](#purge-queue)
+        * [Delete Queue](#delete-queue)
+        * [Delete Exchange](#delete-exchange)
 
 ## Installation
 
@@ -54,7 +62,8 @@ go env -w GONOSUMDB="gitlab.kardinal.ai/*"
 
 ### Environment variables
 
-The client's and manager's `Mode` can also be set via an environment variable that will **override** the manually entered value.
+The client's and manager's `Mode` can also be set via an environment variable that will **override** the manually
+entered value.
 
 ```dotenv
 GORABBIT_MODE: debug    # possible values: release or debug
@@ -198,13 +207,15 @@ options := gorabbit.SendOptions()
 err := client.PublishWithOptions("events_exchange", "event.foo.bar.created", "foo string", options)
 ```
 
-> :information_source: If the `KeepAlive` flag is set to true when initializing the client, failed publishing will be cached once
+> :information_source: If the `KeepAlive` flag is set to true when initializing the client, failed publishing will be
+> cached once
 > and re-published as soon as the channel is back up.
 
 ### Consuming
 
 To consume messages, gorabbit offers a very simple asynchronous consumer method `Consume` that takes a `MessageConsumer`
-as argument. Error handling, acknowledgement, negative acknowledgement and rejection are all done internally by the consumer.
+as argument. Error handling, acknowledgement, negative acknowledgement and rejection are all done internally by the
+consumer.
 
 ```go
 err := client.RegisterConsumer(gorabbit.MessageConsumer{
@@ -215,12 +226,12 @@ err := client.RegisterConsumer(gorabbit.MessageConsumer{
 	AutoAck:           false,
 	ConcurrentProcess: false,
 	Handlers: gorabbit.MQTTMessageHandlers{
-		"event.toto": func(payload []byte) error {
+		"event.toto": func (payload []byte) error {
 			fmt.Println(string(payload))
-				
+			
 			return nil
 		},
-	},
+    },
 })
 ```
 
@@ -232,8 +243,10 @@ err := client.RegisterConsumer(gorabbit.MessageConsumer{
 * ConcurrentProcess: Asynchronous handling of deliveries
 * Handlers: A list of handlers for specified routes
 
-> :information_source: If the `KeepAlive` flag is set to true when initializing the client, consumers will auto-reconnect after a connection loss.
-> This mechanism is indefinite and therefore, consuming from a non-existent queue will trigger an error repeatedly but will not affect
+> :information_source: If the `KeepAlive` flag is set to true when initializing the client, consumers will
+> auto-reconnect after a connection loss.
+> This mechanism is indefinite and therefore, consuming from a non-existent queue will trigger an error repeatedly but
+> will not affect
 > other consumptions. This is because each consumer has its **own channel**.
 
 ## Manager
@@ -290,7 +303,8 @@ We can input custom values for a specific property, either via the built-in buil
 
 #### Manager options using the builder
 
-`NewManagerOptions()` and `DefaultManagerOptions()` both return an instance of `*ManagerOptions` that can act as a builder.
+`NewManagerOptions()` and `DefaultManagerOptions()` both return an instance of `*ManagerOptions` that can act as a
+builder.
 
 ```go
 options := gorabbit.NewManagerOptions()
@@ -328,6 +342,105 @@ When a manager is initialized, to prevent a leak, always disconnect it when no l
 ```go
 manager := gorabbit.NewManager(gorabbit.DefaultManagerOptions())
 defer manager.Disconnect()
+```
+
+### Manager operations
+
+The manager offers all necessary operation to manager a RabbitMQ server.
+
+#### Exchange creation
+
+Creates an exchange with optional arguments.
+
+```go
+err := manager.CreateExchange(gorabbit.ExchangeConfig{
+    Name:      "events_exchange",
+    Type:      gorabbit.ExchangeTypeTopic,
+    Persisted: false,
+    Args:      nil,
+})
+```
+
+#### Queue creation
+
+Creates a queue with optional arguments and bindings if declared.
+
+```go
+err := manager.CreateQueue(gorabbit.QueueConfig{
+    Name:      "events_queue",
+    Durable:   false,
+    Exclusive: false,
+    Args:      nil,
+    Bindings: &[]gorabbit.BindingConfig{
+        {
+            RoutingKey: "event.toto",
+            Exchange:   "events_exchange",
+        },
+    },
+})
+```
+
+### Binding creation
+
+Binds a queue to an exchange via a given routing key.
+
+```go
+err := manager.BindExchangeToQueueViaRoutingKey("events_exchange", "events_queue", "event.toto")
+```
+
+### Queue messages count
+
+Returns the number of messages in a queue, or an error if the queue does not exist. This method can also evaluate the
+existence of a queue.
+
+```go
+messageCount, err := manager.GetNumberOfMessages(gorabbit.QueueConfig{
+    Name:      "events_queue",
+    Durable:   false,
+    Exclusive: false,
+)
+```
+
+A `QueueConfig` is used due to the nature of the operation.
+
+### Push message
+
+Pushes a single message to a given exchange.
+
+```go
+err := manager.PushMessageToExchange("events_exchange", "event.toto", "single_message_payload")
+```
+
+### Pop message
+
+Retrieves a single message from a given queue and auto acknowledges it if `autoAck` is set to true.
+
+```go
+message, err := manager.PopMessageFromQueue("events_queue", true)
+```
+
+### Purge queue
+
+Deletes all messages from a given queue.
+
+```go
+err := manager.PurgeQueue("events_queue")
+```
+
+### Delete queue
+
+Deletes a given queue.
+
+```go
+err := manager.DeleteQueue("events_queue")
+```
+
+### Delete exchange
+
+Deletes a given exchange.
+
+```go
+err := manager.DeleteExchange("events_exchange")
 ```
 
 ## Launch Local RabbitMQ Server
