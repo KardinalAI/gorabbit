@@ -12,6 +12,7 @@ Official V3 release of Gorabbit with **Breaking Changes**
   * Multi-connection support
   * Multi-channel support
   * Strong `keep alive` mechanism if enabled
+* Better logs with Logrus
 * Added `golangci-lint` linter for a cleaner codebase
 * Every piece of code is now documented
 
