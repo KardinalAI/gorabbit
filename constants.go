@@ -20,17 +20,32 @@ const (
 )
 
 const (
-	MaxRetryHeader = "x-death-count"
+	xDeathCountHeader = "x-death-count"
 )
 
 // Connection Types.
 
-type ConnectionType string
+type connectionType string
 
 const (
-	Consumer  ConnectionType = "consumer"
-	Publisher ConnectionType = "publisher"
+	connectionTypeConsumer  connectionType = "consumer"
+	connectionTypePublisher connectionType = "publisher"
 )
+
+// Exchange Types
+
+type ExchangeType string
+
+const (
+	ExchangeTypeTopic   ExchangeType = "topic"
+	ExchangeTypeDirect  ExchangeType = "direct"
+	ExchangeTypeFanout  ExchangeType = "fanout"
+	ExchangeTypeHeaders ExchangeType = "headers"
+)
+
+func (e ExchangeType) String() string {
+	return string(e)
+}
 
 // Priority Levels.
 

@@ -16,7 +16,7 @@ type amqpChannels []*amqpChannel
 // publishingChannel loops through all channels and returns the first available publisher channel if it exists.
 func (a amqpChannels) publishingChannel() *amqpChannel {
 	for _, channel := range a {
-		if channel != nil && channel.connectionType == Publisher {
+		if channel != nil && channel.connectionType == connectionTypePublisher {
 			return channel
 		}
 	}
@@ -72,8 +72,8 @@ type amqpChannel struct {
 	// logger logs events.
 	logger Logger
 
-	// connectionType defines the ConnectionType.
-	connectionType ConnectionType
+	// connectionType defines the connectionType.
+	connectionType connectionType
 }
 
 // newConsumerChannel instantiates a new consumerChannel and amqpChannel for method inheritance.
@@ -90,7 +90,7 @@ func newConsumerChannel(ctx context.Context, connection *amqp.Connection, keepAl
 		keepAlive:         keepAlive,
 		retryDelay:        retryDelay,
 		logger:            logger,
-		connectionType:    Consumer,
+		connectionType:    connectionTypeConsumer,
 		consumptionHealth: make(consumptionHealth),
 		consumer:          consumer,
 	}
@@ -120,7 +120,7 @@ func newPublishingChannel(ctx context.Context, connection *amqp.Connection, keep
 		keepAlive:       keepAlive,
 		retryDelay:      retryDelay,
 		logger:          logger,
-		connectionType:  Publisher,
+		connectionType:  connectionTypePublisher,
 		publishingCache: newTTLMap[string, mqttPublishing](publishingCacheSize, publishingCacheTTL),
 		maxRetry:        maxRetry,
 	}
@@ -234,7 +234,7 @@ func (c *amqpChannel) ready() bool {
 
 // healthy returns true if the channel exists and is not closed.
 func (c *amqpChannel) healthy() bool {
-	if c.connectionType == Consumer {
+	if c.connectionType == connectionTypeConsumer {
 		return c.ready() && c.consumptionHealth.IsHealthy()
 	}
 
@@ -243,7 +243,7 @@ func (c *amqpChannel) healthy() bool {
 
 // onChannelOpened is called when a channel is successfully opened.
 func (c *amqpChannel) onChannelOpened() {
-	if c.connectionType == Consumer {
+	if c.connectionType == connectionTypeConsumer {
 		// We re-instantiate the consumptionContext and consumptionCancel.
 		c.consumptionCtx, c.consumptionCancel = context.WithCancel(c.ctx)
 
@@ -269,7 +269,7 @@ func (c *amqpChannel) onChannelOpened() {
 
 // onChannelClosed is called when a channel is closed.
 func (c *amqpChannel) onChannelClosed() {
-	if c.connectionType == Consumer {
+	if c.connectionType == connectionTypeConsumer {
 		// We cancel the consumptionCtx.
 		c.consumptionCancel()
 	}
@@ -374,8 +374,8 @@ func (c *amqpChannel) retryDelivery(delivery *amqp.Delivery, alreadyAcknowledged
 			// We wait for the retry delay before retrying a message.
 			time.Sleep(c.retryDelay)
 
-			// We first extract the MaxRetryHeader.
-			maxRetryHeader, exists := delivery.Headers[MaxRetryHeader]
+			// We first extract the xDeathCountHeader.
+			maxRetryHeader, exists := delivery.Headers[xDeathCountHeader]
 
 			// If the header doesn't exist.
 			if !exists {
@@ -399,14 +399,14 @@ func (c *amqpChannel) retryDelivery(delivery *amqp.Delivery, alreadyAcknowledged
 				return
 			}
 
-			// If the retries count is still greater than 0, we re-publish the delivery with a decremented MaxRetryHeader.
+			// If the retries count is still greater than 0, we re-publish the delivery with a decremented xDeathCountHeader.
 			if retriesCount > 0 {
 				// We first negative acknowledge the existing delivery to remove it from queue if the autoAck flag is set to false.
 				if !alreadyAcknowledged {
 					_ = delivery.Nack(false, false)
 				}
 
-				// We create a new publishing which is a copy of the old one but with a decremented MaxRetryHeader.
+				// We create a new publishing which is a copy of the old one but with a decremented xDeathCountHeader.
 				newPublishing := amqp.Publishing{
 					ContentType:  "text/plain",
 					Body:         delivery.Body,
@@ -416,7 +416,7 @@ func (c *amqpChannel) retryDelivery(delivery *amqp.Delivery, alreadyAcknowledged
 					MessageId:    delivery.MessageId,
 					Timestamp:    delivery.Timestamp,
 					Headers: map[string]interface{}{
-						MaxRetryHeader: int(retriesCount - 1),
+						xDeathCountHeader: int(retriesCount - 1),
 					},
 				}
 
@@ -447,7 +447,7 @@ func (c *amqpChannel) publish(exchange string, routingKey string, payload []byte
 		MessageId:    uuid.NewString(),
 		Timestamp:    time.Now(),
 		Headers: map[string]interface{}{
-			MaxRetryHeader: int(c.maxRetry),
+			xDeathCountHeader: int(c.maxRetry),
 		},
 	}
 

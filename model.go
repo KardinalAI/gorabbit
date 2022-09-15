@@ -5,9 +5,9 @@ import (
 )
 
 type ExchangeConfig struct {
-	Name      string `yaml:"name"`
-	Type      string `yaml:"type"`
-	Persisted bool   `yaml:"persisted"`
+	Name      string       `yaml:"name"`
+	Type      ExchangeType `yaml:"type"`
+	Persisted bool         `yaml:"persisted"`
 }
 
 type QueueConfig struct {

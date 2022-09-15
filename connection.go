@@ -42,8 +42,8 @@ type amqpConnection struct {
 	// logger logs events.
 	logger Logger
 
-	// connectionType defines the ConnectionType.
-	connectionType ConnectionType
+	// connectionType defines the connectionType.
+	connectionType connectionType
 }
 
 // newConsumerConnection initializes a new consumer amqpConnection with given arguments.
@@ -53,7 +53,7 @@ type amqpConnection struct {
 //   - retryDelay defines the delay between each re-connection, if the keepAlive flag is set to true.
 //   - logger is the parent logger.
 func newConsumerConnection(ctx context.Context, uri string, keepAlive bool, retryDelay time.Duration, logger Logger) *amqpConnection {
-	return newConnection(ctx, uri, keepAlive, retryDelay, logger, Consumer)
+	return newConnection(ctx, uri, keepAlive, retryDelay, logger, connectionTypeConsumer)
 }
 
 // newPublishingConnection initializes a new publisher amqpConnection with given arguments.
@@ -66,7 +66,7 @@ func newConsumerConnection(ctx context.Context, uri string, keepAlive bool, retr
 //   - publishingCacheTTL defines the time to live for failed publishing in cache.
 //   - logger is the parent logger.
 func newPublishingConnection(ctx context.Context, uri string, keepAlive bool, retryDelay time.Duration, maxRetry uint, publishingCacheSize uint64, publishingCacheTTL time.Duration, logger Logger) *amqpConnection {
-	conn := newConnection(ctx, uri, keepAlive, retryDelay, logger, Publisher)
+	conn := newConnection(ctx, uri, keepAlive, retryDelay, logger, connectionTypePublisher)
 
 	conn.maxRetry = maxRetry
 	conn.publishingCacheSize = publishingCacheSize
@@ -81,7 +81,7 @@ func newPublishingConnection(ctx context.Context, uri string, keepAlive bool, re
 //   - keepAlive will keep the connection alive if true.
 //   - retryDelay defines the delay between each re-connection, if the keepAlive flag is set to true.
 //   - logger is the parent logger.
-func newConnection(ctx context.Context, uri string, keepAlive bool, retryDelay time.Duration, logger Logger, connectionType ConnectionType) *amqpConnection {
+func newConnection(ctx context.Context, uri string, keepAlive bool, retryDelay time.Duration, logger Logger, connectionType connectionType) *amqpConnection {
 	conn := &amqpConnection{
 		ctx:            ctx,
 		uri:            uri,

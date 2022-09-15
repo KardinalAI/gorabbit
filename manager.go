@@ -214,13 +214,13 @@ func (manager *mqttManager) CreateExchange(config ExchangeConfig) error {
 
 	// We declare the exchange via the channel.
 	return manager.channel.ExchangeDeclare(
-		config.Name,       // name
-		config.Type,       // type
-		config.Persisted,  // durable
-		!config.Persisted, // auto-deleted
-		false,             // internal
-		false,             // no-wait
-		nil,               // arguments
+		config.Name,          // name
+		config.Type.String(), // type
+		config.Persisted,     // durable
+		!config.Persisted,    // auto-deleted
+		false,                // internal
+		false,                // no-wait
+		nil,                  // arguments
 	)
 }
 
