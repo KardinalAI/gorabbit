@@ -100,6 +100,8 @@ func newConsumerChannel(ctx context.Context, connection *amqp.Connection, keepAl
 
 	// If the channel failed to open and the keepAlive flag is set to true, we want to retry until success.
 	if err != nil && keepAlive {
+		channel.logger.Printf("Cannot open channel: %s. Retrying...", err.Error())
+
 		go channel.retry()
 	}
 
@@ -286,6 +288,11 @@ func (c *amqpChannel) getID() string {
 
 // consume handles the consumption mechanism.
 func (c *amqpChannel) consume() {
+	// If the channel is not ready, we cannot consume.
+	if !c.ready() {
+		return
+	}
+
 	// TODO(Alex): Double check why setting a prefetch size greater than 0 causes an error
 	// Set the QOS, which defines how many messages can be processed at the same time.
 	err := c.channel.Qos(c.consumer.PrefetchCount, c.consumer.PrefetchSize, false)
@@ -438,6 +445,11 @@ func (c *amqpChannel) retryDelivery(delivery *amqp.Delivery, alreadyAcknowledged
 
 // publish will publish a message with the given configuration.
 func (c *amqpChannel) publish(exchange string, routingKey string, payload []byte, options *publishingOptions) error {
+	// If the channel is not ready, we cannot publish.
+	if !c.ready() {
+		return errChannelClosed
+	}
+
 	publishing := &amqp.Publishing{
 		ContentType:  "text/plain",
 		Body:         payload,

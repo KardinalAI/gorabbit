@@ -4,8 +4,7 @@ import (
 	"gitlab.kardinal.ai/coretech/go-logging"
 )
 
-// Logger is the interface to send logs to. It can be set using
-// WithPublisherOptionsLogger() or WithConsumerOptionsLogger().
+// Logger is the interface that defines log methods.
 type Logger interface {
 	Printf(string, ...interface{})
 }
