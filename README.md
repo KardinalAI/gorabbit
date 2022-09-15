@@ -4,6 +4,31 @@ Gorabbit is a wrapper that provides high level and robust RabbitMQ operations th
 
 This wrapper depends on the official [Go RabbitMQ plugin](https://github.com/rabbitmq/amqp091-go).
 
+* [Installation](#installation)
+   * [Go Module](#go-module)
+   * [Issues](#possible-issues)
+   * [Environment Variables](#environment-variables)
+* [Client](#client)
+   * [Initialisation](#client-initialization) 
+   * [Options](#client-options)
+   * [Default Options](#client-with-default-options)
+   * [Custom Options](#client-with-custom-options)
+     * [Builder](#client-options-using-the-builder)
+     * [Struct](#client-options-using-struct-initialization)
+   * [Disconnection](#client-disconnection)
+   * [Publishing](#publishing)
+   * [Consuming](#consuming)
+* [Manager](#manager)
+    * [Initialisation](#manager-initialization)
+    * [Options](#manager-options)
+    * [Default Options](#manager-with-default-options)
+    * [Custom Options](#manager-with-custom-options)
+        * [Builder](#manager-options-using-the-builder)
+        * [Struct](#manager-options-using-struct-initialization)
+    * [Disconnection](#manager-disconnection)
+  
+  
+
 ## Installation
 
 ### Go module
@@ -27,6 +52,20 @@ go env -w GONOPROXY="gitlab.kardinal.ai/*"
 go env -w GONOSUMDB="gitlab.kardinal.ai/*"
 ```
 
+### Environment variables
+
+The client's and manager's `Mode` can also be set via an environment variable that will **override** the manually entered value.
+
+```dotenv
+GORABBIT_MODE: debug    # possible values: release or debug
+```
+
+The client and manager can also be completely disabled via the following environment variable:
+
+```dotenv
+GORABBIT_DISABLED: true     # possible values: true, false, 1, or 0 
+```
+
 ## Client
 
 The gorabbit client offers 2 main functionalities:
@@ -36,12 +75,12 @@ The gorabbit client offers 2 main functionalities:
 
 Additionally, the client also provides a ready check and a health check.
 
-### Initialization
+### Client initialization
 
 A client can be initialized via the constructor `NewClient`. This constructor takes `ClientOptions` as an optional
 parameter.
 
-### Options
+### Client options
 
 | Property            | Description                                             | Default Value |
 |---------------------|---------------------------------------------------------|---------------|
@@ -81,7 +120,7 @@ client := gorabbit.NewClient(gorabbit.NewClientOptions())
 
 We can input custom values for a specific property, either via the built-in builder or via direct struct initialization.
 
-#### Using the builder
+#### Client options using the builder
 
 `NewClientOptions()` and `DefaultClientOptions()` both return an instance of `*ClientOptions` that can act as a builder.
 
@@ -96,7 +135,7 @@ client := gorabbit.NewClient(options)
 
 > :information_source: There is a setter method for each property.
 
-#### Using struct initialization
+#### Client options using struct initialization
 
 `ClientOptions` is an exported type, so it can be used directly.
 
@@ -115,21 +154,7 @@ client := gorabbit.NewClient(&options)
 > :warning: Direct initialization via the struct **does not use default values on missing properties**, so be sure to
 > fill in every property available.
 
-### Environment Variables
-
-The client's `Mode` can also be set via an environment variable that will **override** the manually entered value.
-
-```dotenv
-GORABBIT_MODE: debug    # possible values: release or debug
-```
-
-The client can also be completely disabled via the following environment variable:
-
-```dotenv
-GORABBIT_DISABLED: true     # possible values: true, false, 1, or 0 
-```
-
-### Disconnection
+### Client disconnection
 
 When a client is initialized, to prevent a leak, always disconnect it when no longer needed.
 
@@ -223,12 +248,12 @@ The gorabbit manager offers multiple management operations:
 > :warning: A manager should only be used for either testing RabbitMQ functionalities or setting up a RabbitMQ server.
 > The manager does not provide robust mechanisms of retry and reconnection like the client.
 
-### Initialization
+### Manager initialization
 
 A manager can be initialized via the constructor `NewManager`. This constructor takes `ManagerOptions` as an optional
 parameter.
 
-### Options
+### Manager options
 
 | Property            | Description                                             | Default Value |
 |---------------------|---------------------------------------------------------|---------------|
@@ -263,7 +288,7 @@ manager := gorabbit.NewManager(gorabbit.NewManagerOptions())
 
 We can input custom values for a specific property, either via the built-in builder or via direct struct initialization.
 
-#### Using the builder
+#### Manager options using the builder
 
 `NewManagerOptions()` and `DefaultManagerOptions()` both return an instance of `*ManagerOptions` that can act as a builder.
 
@@ -277,7 +302,7 @@ manager := gorabbit.NewManager(options)
 
 > :information_source: There is a setter method for each property.
 
-#### Using struct initialization
+#### Manager options using struct initialization
 
 `ManagerOptions` is an exported type, so it can be used directly.
 
@@ -296,21 +321,7 @@ manager := gorabbit.NewManager(&options)
 > :warning: Direct initialization via the struct **does not use default values on missing properties**, so be sure to
 > fill in every property available.
 
-### Environment Variables
-
-The manager's `Mode` can also be set via an environment variable that will **override** the manually entered value.
-
-```dotenv
-GORABBIT_MODE: debug    # possible values: release or debug
-```
-
-The manager can also be completely disabled via the following environment variable:
-
-```dotenv
-GORABBIT_DISABLED: true     # possible values: true, false, 1, or 0 
-```
-
-### Disconnection
+### Manager disconnection
 
 When a manager is initialized, to prevent a leak, always disconnect it when no longer needed.
 
