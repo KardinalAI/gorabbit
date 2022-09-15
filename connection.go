@@ -83,22 +83,25 @@ func newPublishingConnection(ctx context.Context, uri string, keepAlive bool, re
 //   - logger is the parent logger.
 func newConnection(ctx context.Context, uri string, keepAlive bool, retryDelay time.Duration, logger Logger, connectionType connectionType) *amqpConnection {
 	conn := &amqpConnection{
-		ctx:            ctx,
-		uri:            uri,
-		keepAlive:      keepAlive,
-		retryDelay:     retryDelay,
-		channels:       make(amqpChannels, 0),
-		logger:         logger,
+		ctx:        ctx,
+		uri:        uri,
+		keepAlive:  keepAlive,
+		retryDelay: retryDelay,
+		channels:   make(amqpChannels, 0),
+		logger: inheritLogger(logger, map[string]interface{}{
+			"context": "connection",
+			"type":    connectionType,
+		}),
 		connectionType: connectionType,
 	}
+
+	conn.logger.WithField("uri", uri).Debug("Initializing new amqp connection")
 
 	// We open an initial connection.
 	err := conn.open()
 
 	// If the connection failed and the keepAlive flag is set to true, we want to re-connect until success.
 	if err != nil && keepAlive {
-		conn.logger.Printf("Could not instantiate connection: %s. Trying again.", err.Error())
-
 		go conn.reconnect()
 	}
 
@@ -112,11 +115,17 @@ func (a *amqpConnection) open() error {
 		return errEmptyURI
 	}
 
+	a.logger.WithField("uri", a.uri).Debug("Connecting to RabbitMQ server")
+
 	// We request a connection from the RabbitMQ server.
 	conn, err := amqp.Dial(a.uri)
 	if err != nil {
+		a.logger.Error(err, "Connection failed")
+
 		return err
 	}
+
+	a.logger.WithField("uri", a.uri).Info("Connection successful")
 
 	a.connection = conn
 
@@ -132,9 +141,13 @@ func (a *amqpConnection) open() error {
 
 // reconnect will indefinitely call the open method until a connection is successfully established or the context is canceled.
 func (a *amqpConnection) reconnect() {
+	a.logger.Debug("Re-connection launched")
+
 	for {
 		select {
 		case <-a.ctx.Done():
+			a.logger.Debug("Re-connection stopped by the context")
+
 			// If the context was canceled, we break out of the method.
 			return
 		default:
@@ -146,10 +159,12 @@ func (a *amqpConnection) reconnect() {
 				err := a.open()
 				// If the operation succeeds, we break the loop.
 				if err == nil {
+					a.logger.Debug("Re-connection successful")
+
 					return
 				}
 
-				a.logger.Printf("Could not reconnect: %s. Trying again.", err.Error())
+				a.logger.Error(err, "Could not open new connection during re-connection")
 			} else {
 				// If the connection exists and is active, we break out.
 				return
@@ -160,9 +175,13 @@ func (a *amqpConnection) reconnect() {
 
 // guard is a connection safeguard that listens to connection close events and re-launches the connection.
 func (a *amqpConnection) guard() {
+	a.logger.Debug("Guard launched")
+
 	for {
 		select {
 		case <-a.ctx.Done():
+			a.logger.Debug("Guard stopped by the context")
+
 			// If the context was canceled, we break out of the method.
 			return
 		case err, ok := <-a.connection.NotifyClose(make(chan *amqp.Error)):
@@ -171,7 +190,7 @@ func (a *amqpConnection) guard() {
 			}
 
 			if err != nil {
-				a.logger.Printf("Connection closed: %s.", err.Error())
+				a.logger.WithField("reason", err.Reason).WithField("code", err.Code).Warn("Connection lost")
 			}
 
 			// If the connection was explicitly closed, we do not want to re-connect.
@@ -198,11 +217,15 @@ func (a *amqpConnection) close() error {
 
 		err := a.connection.Close()
 		if err != nil {
+			a.logger.Error(err, "Could not close connection")
+
 			return err
 		}
 	}
 
 	a.closed = true
+
+	a.logger.Info("Connection closed")
 
 	return nil
 }
@@ -233,13 +256,19 @@ func (a *amqpConnection) healthy() bool {
 func (a *amqpConnection) registerConsumer(consumer MessageConsumer) error {
 	for _, channel := range a.channels {
 		if channel.consumer != nil && channel.consumer.Queue == consumer.Queue {
-			return errConsumerAlreadyExists
+			err := errConsumerAlreadyExists
+
+			a.logger.WithField("consumer", consumer.Name).Error(err, "Could not register consumer")
+
+			return err
 		}
 	}
 
 	channel := newConsumerChannel(a.ctx, a.connection, a.keepAlive, a.retryDelay, &consumer, a.logger)
 
 	a.channels = append(a.channels, channel)
+
+	a.logger.WithField("consumer", consumer.Name).Info("Consumer registered")
 
 	return nil
 }

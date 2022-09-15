@@ -5,6 +5,9 @@ import (
 	"time"
 )
 
+// Library name.
+const libraryName = "Gorabbit"
+
 // Default values for the ClientOptions and ManagerOptions.
 const (
 	defaultHost                = "127.0.0.1"

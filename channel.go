@@ -85,11 +85,16 @@ type amqpChannel struct {
 //   - maxRetry is the retry header for each message.
 func newConsumerChannel(ctx context.Context, connection *amqp.Connection, keepAlive bool, retryDelay time.Duration, consumer *MessageConsumer, logger Logger) *amqpChannel {
 	channel := &amqpChannel{
-		ctx:               ctx,
-		connection:        connection,
-		keepAlive:         keepAlive,
-		retryDelay:        retryDelay,
-		logger:            logger,
+		ctx:        ctx,
+		connection: connection,
+		keepAlive:  keepAlive,
+		retryDelay: retryDelay,
+		logger: inheritLogger(logger, map[string]interface{}{
+			"context":  "channel",
+			"type":     connectionTypeConsumer,
+			"consumer": consumer.Name,
+			"queue":    consumer.Queue,
+		}),
 		connectionType:    connectionTypeConsumer,
 		consumptionHealth: make(consumptionHealth),
 		consumer:          consumer,
@@ -100,8 +105,6 @@ func newConsumerChannel(ctx context.Context, connection *amqp.Connection, keepAl
 
 	// If the channel failed to open and the keepAlive flag is set to true, we want to retry until success.
 	if err != nil && keepAlive {
-		channel.logger.Printf("Cannot open channel: %s. Retrying...", err.Error())
-
 		go channel.retry()
 	}
 
@@ -117,11 +120,14 @@ func newConsumerChannel(ctx context.Context, connection *amqp.Connection, keepAl
 //   - maxRetry is the retry header for each message.
 func newPublishingChannel(ctx context.Context, connection *amqp.Connection, keepAlive bool, retryDelay time.Duration, maxRetry uint, publishingCacheSize uint64, publishingCacheTTL time.Duration, logger Logger) *amqpChannel {
 	channel := &amqpChannel{
-		ctx:             ctx,
-		connection:      connection,
-		keepAlive:       keepAlive,
-		retryDelay:      retryDelay,
-		logger:          logger,
+		ctx:        ctx,
+		connection: connection,
+		keepAlive:  keepAlive,
+		retryDelay: retryDelay,
+		logger: inheritLogger(logger, map[string]interface{}{
+			"context": "channel",
+			"type":    connectionTypeConsumer,
+		}),
 		connectionType:  connectionTypePublisher,
 		publishingCache: newTTLMap[string, mqttPublishing](publishingCacheSize, publishingCacheTTL),
 		maxRetry:        maxRetry,
@@ -142,16 +148,24 @@ func newPublishingChannel(ctx context.Context, connection *amqp.Connection, keep
 func (c *amqpChannel) open() error {
 	// If the channel is nil or closed we return an error.
 	if c.connection == nil || c.connection.IsClosed() {
-		return errConnectionClosed
+		err := errConnectionClosed
+
+		c.logger.Error(err, "Could not open channel")
+
+		return err
 	}
 
 	// We request a channel from the parent connection.
 	channel, err := c.connection.Channel()
 	if err != nil {
+		c.logger.Error(err, "Could not open channel")
+
 		return err
 	}
 
 	c.channel = channel
+
+	c.logger.Info("Channel opened")
 
 	c.onChannelOpened()
 
@@ -165,9 +179,13 @@ func (c *amqpChannel) open() error {
 
 // reconnect will indefinitely call the open method until a connection is successfully established or the context is canceled.
 func (c *amqpChannel) retry() {
+	c.logger.Debug("Retry launched")
+
 	for {
 		select {
 		case <-c.ctx.Done():
+			c.logger.Debug("Retry stopped by the context")
+
 			// If the context was canceled, we break out of the method.
 			return
 		default:
@@ -179,8 +197,12 @@ func (c *amqpChannel) retry() {
 				err := c.open()
 				// If the operation succeeds, we break the loop.
 				if err == nil {
+					c.logger.Debug("Retry successful")
+
 					return
 				}
+
+				c.logger.Error(err, "Could not open new channel during retry")
 			} else {
 				// If the channel exists and is active, we break out.
 				return
@@ -191,14 +213,22 @@ func (c *amqpChannel) retry() {
 
 // guard is a channel safeguard that listens to channel close events and re-launches the channel.
 func (c *amqpChannel) guard() {
+	c.logger.Debug("Guard launched")
+
 	for {
 		select {
 		case <-c.ctx.Done():
+			c.logger.Debug("Guard stopped by the context")
+
 			// If the context was canceled, we break out of the method.
 			return
-		case _, ok := <-c.channel.NotifyClose(make(chan *amqp.Error)):
+		case err, ok := <-c.channel.NotifyClose(make(chan *amqp.Error)):
 			if !ok {
 				return
+			}
+
+			if err != nil {
+				c.logger.WithField("reason", err.Reason).WithField("code", err.Code).Warn("Channel lost")
 			}
 
 			// If the channel was explicitly closed, we do not want to retry.
@@ -220,6 +250,8 @@ func (c *amqpChannel) close() error {
 	if c.ready() {
 		err := c.channel.Close()
 		if err != nil {
+			c.logger.Error(err, "Could not close channel")
+
 			return err
 		}
 	}
@@ -251,6 +283,8 @@ func (c *amqpChannel) onChannelOpened() {
 
 		// This is just a safeguard.
 		if c.consumer != nil {
+			c.logger.WithField("event", "onChannelOpened").Info("Launching consumer")
+
 			// If the consumer is present we want to start consuming.
 			go c.consume()
 		}
@@ -259,6 +293,8 @@ func (c *amqpChannel) onChannelOpened() {
 		if c.publishingCache == nil || c.publishingCache.Len() == 0 {
 			return
 		}
+
+		c.logger.WithField("event", "onChannelOpened").Info("Emptying publishing cache")
 
 		// For each cached unsuccessful message, we try publishing it again.
 		c.publishingCache.ForEach(func(key string, msg mqttPublishing) {
@@ -272,6 +308,8 @@ func (c *amqpChannel) onChannelOpened() {
 // onChannelClosed is called when a channel is closed.
 func (c *amqpChannel) onChannelClosed() {
 	if c.connectionType == connectionTypeConsumer {
+		c.logger.WithField("event", "onChannelClosed").Info("Canceling consumptions")
+
 		// We cancel the consumptionCtx.
 		c.consumptionCancel()
 	}
@@ -288,8 +326,10 @@ func (c *amqpChannel) getID() string {
 
 // consume handles the consumption mechanism.
 func (c *amqpChannel) consume() {
+	// TODO(Alex): Check if this can actually happen
 	// If the channel is not ready, we cannot consume.
 	if !c.ready() {
+		c.logger.Warn("Channel not ready, cannot launch consumer")
 		return
 	}
 
@@ -297,7 +337,8 @@ func (c *amqpChannel) consume() {
 	// Set the QOS, which defines how many messages can be processed at the same time.
 	err := c.channel.Qos(c.consumer.PrefetchCount, c.consumer.PrefetchSize, false)
 	if err != nil {
-		c.logger.Printf("Could not define QOS for consumer %s: %s", c.consumer.Name, err.Error())
+		c.logger.Error(err, "Could not define QOS for consumer")
+
 		return
 	}
 
@@ -306,7 +347,7 @@ func (c *amqpChannel) consume() {
 	c.consumptionHealth.AddSubscription(c.consumer.Queue, err)
 
 	if err != nil {
-		c.logger.Printf("Could not consume messages for queue %s", c.consumer.Queue)
+		c.logger.Error(err, "Could not consume messages")
 		return
 	}
 
@@ -317,6 +358,8 @@ func (c *amqpChannel) consume() {
 		case delivery := <-deliveries:
 			// When a queue is deleted midway, a delivery with no tag or ID is received.
 			if delivery.DeliveryTag == 0 && delivery.MessageId == "" {
+				c.logger.Warn("Queue has been deleted, stopping consumer")
+
 				return
 			}
 
@@ -341,6 +384,8 @@ func (c *amqpChannel) processDelivery(delivery *amqp.Delivery) {
 
 	// If the handler doesn't exist for the received delivery, we negative acknowledge it without requeue.
 	if !found {
+		c.logger.WithField("routingKey", delivery.RoutingKey).Debug("No handler found")
+
 		// If the consumer is not set to auto acknowledge the delivery, we negative acknowledge it without requeue.
 		if !c.consumer.AutoAck {
 			_ = delivery.Nack(false, false)
@@ -362,6 +407,8 @@ func (c *amqpChannel) processDelivery(delivery *amqp.Delivery) {
 
 	// If there is no error, we can simply acknowledge the delivery.
 	if err == nil {
+		c.logger.WithField("messageID", delivery.MessageId).Debug("Delivery successfully processed")
+
 		_ = delivery.Ack(false)
 
 		return
@@ -373,9 +420,13 @@ func (c *amqpChannel) processDelivery(delivery *amqp.Delivery) {
 
 // retryDelivery processes a delivery retry based on its redelivery header.
 func (c *amqpChannel) retryDelivery(delivery *amqp.Delivery, alreadyAcknowledged bool) {
+	c.logger.Debug("Delivery retry launched")
+
 	for {
 		select {
 		case <-c.consumptionCtx.Done():
+			c.logger.Debug("Delivery retry stopped by the consumption context")
+
 			return
 		default:
 			// We wait for the retry delay before retrying a message.
@@ -386,6 +437,8 @@ func (c *amqpChannel) retryDelivery(delivery *amqp.Delivery, alreadyAcknowledged
 
 			// If the header doesn't exist.
 			if !exists {
+				c.logger.Debug("Delivery retry invalid")
+
 				// We negative acknowledge the delivery without requeue if the autoAck flag is set to false.
 				if !alreadyAcknowledged {
 					_ = delivery.Nack(false, false)
@@ -399,6 +452,8 @@ func (c *amqpChannel) retryDelivery(delivery *amqp.Delivery, alreadyAcknowledged
 
 			// If the casting fails,we negative acknowledge the delivery without requeue if the autoAck flag is set to false.
 			if !ok {
+				c.logger.Debug("Delivery retry invalid")
+
 				if !alreadyAcknowledged {
 					_ = delivery.Nack(false, false)
 				}
@@ -408,6 +463,8 @@ func (c *amqpChannel) retryDelivery(delivery *amqp.Delivery, alreadyAcknowledged
 
 			// If the retries count is still greater than 0, we re-publish the delivery with a decremented xDeathCountHeader.
 			if retriesCount > 0 {
+				c.logger.WithField("retriesLeft", retriesCount-1).Debug("Retrying delivery")
+
 				// We first negative acknowledge the existing delivery to remove it from queue if the autoAck flag is set to false.
 				if !alreadyAcknowledged {
 					_ = delivery.Nack(false, false)
@@ -433,6 +490,8 @@ func (c *amqpChannel) retryDelivery(delivery *amqp.Delivery, alreadyAcknowledged
 				return
 			}
 
+			c.logger.Debug("Cannot retry delivery, max retries reached")
+
 			// Otherwise, we negative acknowledge the delivery without requeue if the autoAck flag is set to false.
 			if !alreadyAcknowledged {
 				_ = delivery.Nack(false, false)
@@ -445,11 +504,6 @@ func (c *amqpChannel) retryDelivery(delivery *amqp.Delivery, alreadyAcknowledged
 
 // publish will publish a message with the given configuration.
 func (c *amqpChannel) publish(exchange string, routingKey string, payload []byte, options *publishingOptions) error {
-	// If the channel is not ready, we cannot publish.
-	if !c.ready() {
-		return errChannelClosed
-	}
-
 	publishing := &amqp.Publishing{
 		ContentType:  "text/plain",
 		Body:         payload,
@@ -469,22 +523,39 @@ func (c *amqpChannel) publish(exchange string, routingKey string, payload []byte
 		publishing.DeliveryMode = options.mode()
 	}
 
-	err := c.channel.PublishWithContext(c.ctx, exchange, routingKey, false, false, *publishing)
+	// If the channel is not ready, we cannot publish, but we send the message to cache if the keepAlive flag is set to true.
+	if !c.ready() {
+		err := errChannelClosed
 
-	// If the message could not be sent and the keepAlive flag is set, we cache it until the channel is back up to publish it again.
-	if err != nil && c.keepAlive {
-		msg := mqttPublishing{
-			Exchange:   exchange,
-			RoutingKey: routingKey,
-			Mandatory:  false,
-			Immediate:  false,
-			Msg:        *publishing,
+		if c.keepAlive {
+			c.logger.Error(err, "Could not publish message, sending to cache")
+
+			msg := mqttPublishing{
+				Exchange:   exchange,
+				RoutingKey: routingKey,
+				Mandatory:  false,
+				Immediate:  false,
+				Msg:        *publishing,
+			}
+
+			c.publishingCache.Put(msg.HashCode(), msg)
+		} else {
+			c.logger.Error(err, "Could not publish message")
 		}
-
-		c.publishingCache.Put(msg.HashCode(), msg)
 
 		return err
 	}
+
+	err := c.channel.PublishWithContext(c.ctx, exchange, routingKey, false, false, *publishing)
+
+	// If the message could not be sent we return an error without caching it.
+	if err != nil {
+		c.logger.Error(err, "Could not publish message")
+
+		return err
+	}
+
+	c.logger.WithField("messageID", publishing.MessageId).Debug("Message successfully sent")
 
 	return nil
 }

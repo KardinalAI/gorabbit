@@ -111,7 +111,7 @@ func NewClient(options *ClientOptions) MQTTClient {
 	switch options.Mode {
 	case Debug:
 		// If the mode is Debug, we want to actually log important events.
-		client.logger = &stdLogger{}
+		client.logger = newStdLogger()
 	default:
 		// Otherwise, we do not want any logs coming from the library.
 		client.logger = &noLogger{}
@@ -171,8 +171,6 @@ func (client *mqttClient) Disconnect() error {
 	err := client.connectionManager.close()
 
 	if err != nil {
-		client.logger.Printf("Could not disconnect: %s", err.Error())
-
 		return err
 	}
 
