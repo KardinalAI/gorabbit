@@ -94,7 +94,7 @@ options := gorabbit.NewClientOptions()
 client := gorabbit.NewClient(options)
 ```
 
-> :information_source: There is a setting for each property.
+> :information_source: There is a setter method for each property.
 
 #### Using struct initialization
 
