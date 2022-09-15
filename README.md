@@ -13,6 +13,7 @@ go get gitlab.kardinal.ai/coretech/gorabbit/v3
 ```
 
 ### Possible issues
+
 If you get an error regarding the host not found, run the following command:
 
 ```bash
@@ -26,179 +27,152 @@ go env -w GONOPROXY="gitlab.kardinal.ai/*"
 go env -w GONOSUMDB="gitlab.kardinal.ai/*"
 ```
 
-## Usage
+## Client
 
-This module contains 4 main functionalities:
+The gorabbit client offers 2 main functionalities:
 
-* Message Sender
-* Message Subscriber
-* Auto Reconnection Handling
-* Failed Messages Retry Strategy
+* Publishing
+* Consuming
 
-## Message Sender
+Additionally, the client also provides a ready check and a health check.
 
-To send a message through MQTT, you need to first declare a client that will automatically connect to the RabbitMQ
-server.
+### Initialization
 
-Note that `MaxRetry` and `RetryDelay` are **optional** fields. If set, they will determine the behavior of the client if
-a first connection fails.
+A client can be initialized via the constructor `NewClient`. This constructor takes `ClientOptions` as an optional
+parameter.
 
-The `MaxRetry` property will define the maximum number of times a client can try to connect if the initial connection
-fails.
-The `RetryDelay` property determines the delay between each connection retry.
+### Options
+
+| Property            | Description                                             | Default Value |
+|---------------------|---------------------------------------------------------|---------------|
+| Host                | The hostname of the RabbitMQ server                     | 127.0.0.1     |
+| Port                | The port of the RabbitMQ server                         | 5672          |
+| Username            | The plain authentication username                       | guest         |
+| Password            | The plain authentication password                       | guest         |
+| KeepAlive           | The flag that activates retry and re-connect mechanisms | true          |
+| RetryDelay          | The delay between each retry and re-connection          | 3 seconds     |
+| MaxRetry            | The max number of message retry if it failed to process | 5             |
+| PublishingCacheTTL  | The time to live for a failed publish when set in cache | 60 seconds    |
+| PublishingCacheSize | The max number of failed publish to add into cache      | 128           |
+| Mode                | The mode defines whether logs are shown or not          | Release       |
+
+### Client with default options
+
+Passing `nil` options will trigger the client to use default values (host, port, credentials, etc...)
+via `DefaultClientOptions()`.
 
 ```go
-var client gorabbit.MQTTClient
+client := gorabbit.NewClient(nil)
+```
 
-clientConfig := gorabbit.ClientConfig{
-Host:      "localhost",
-Port:      5672,
-Username:  "guest",
-Password:  "guest",
-KeepAlive: true,
-Mode:      gorabbit.Debug,
+You can also explicitly pass `DefaultClientOptions()` for a cleaner initialization.
+
+```go
+client := gorabbit.NewClient(gorabbit.DefaultClientOptions())
+```
+
+Finally, passing a `NewClientOptions()` method also initializes default values if not overwritten.
+
+```go
+client := gorabbit.NewClient(gorabbit.NewClientOptions())
+```
+
+### Client with custom options
+
+We can input custom values for a specific property, either via the built-in builder or via direct struct initialization.
+
+#### Using the builder
+
+`NewClientOptions()` and `DefaultClientOptions()` both return an instance of `*ClientOptions` that can act as a builder.
+
+```go
+options := gorabbit.NewClientOptions()
+    .SetMode(gorabbit.Debug)
+    .SetCredentials("root", "password")
+    .SetRetryDelay(5 * time.Second)
+
+client := gorabbit.NewClient(options)
+```
+
+> :information_source: There is a setting for each property.
+
+#### Using struct initialization
+
+`ClientOptions` is an exported type so it can be used directly.
+
+```go
+options := gorabbit.ClentOptions {
+    Host:     "localhost",
+    Port:     5673,
+    Username: "root",
+    Password: "password"
+    ...
 }
 
-client = gorabbit.NewClient(clientConfig)
+client := gorabbit.NewClient(&options)
 ```
 
-You can also initialize a client in **Debug** mode (with logs) by setting the `Mode` property of the
-`ClientConfig` to `gorabbit.Debug` or by setting the following environment variable:
+> :warning: Direct initialization via the struct **does not use default values on missing properties**, so be sure to
+> fill
+> in every property available.
+
+### Environment Variables
+
+The client's `Mode` can also be set via an environment variable that will **override** the manually entered value.
 
 ```dotenv
-GORABBIT_MODE: debug
+GORABBIT_MODE: debug    # possible values: release or debug
 ```
 
-Once the client initialized, the connection and channel will be initialized but do not close at any point yet.
-It is very important to properly manage the closure of both streams otherwise you might not send or receive anything. At
-the
-correct point in the microservice, consider Disconnecting the client with its integrated function:
+The client can also be completely disabled via the following environment variable:
+
+```dotenv
+GORABBIT_DISABLED: true     # possible values: true, false, 1, or 0 
+```
+
+### Disconnection
+
+When a client is initialized, to prevent a leak, always disconnect it when no longer needed.
 
 ```go
+client := gorabbit.NewClient(gorabbit.DefaultClientOptions())
 defer client.Disconnect()
 ```
 
-For example in Gin, this should be declared in your main function before:
+### Publishing
 
-```go 
-router.Run()
-```
+To send a message, the client offers two simple methods: `Publish` and `PublishWithOptions`. The required arguments for
+publishing are:
 
-if you intend to keep an open connection while the app is running.
+* Exchange (which exchange the message should be sent to)
+* Routing Key
+* Payload (`interface{}`, the object will be unmarshalled internally)
 
-Once your client is initialized, to send a message simply call the integrated function as following:
-
-```go
-client.SendMessage("exchange", "routingKey", gorabbit.PriorityLow, payload)
-```
-
-where the payload should be a `[]byte`
-
-## Message Subscriber
-
-The client initialization is the same as the Event Sender.
-
-Once the client is initialized, you can subscribe to a queue of messages by using the integrated function as following:
+Example of sending a simple string
 
 ```go
-messages, err := client.SubscribeToMessages("queue_name", "consumer_name", false)
+err := client.Publish("events_exchange", "event.foo.bar.created", "foo string")
 ```
 
-where messages is an asynchronous incoming stream of events that needs to be properly consumed preferably in a go
-routine.
-
-For example, if you are outside a Gin environment, you need to listen to the stream continuously:
+Example of sending an object
 
 ```go
-forever := make(chan bool)
-
-go func () {
-for m := range messages {
-log.Printf("Received message: %s", m.Body)
+type foo struct {
+    Action string
 }
-}()
 
-<-forever
+err := client.Publish("events_exchange", "event.foo.bar.created", foo{Action: "bar"})
 ```
 
-whereas in Gin, the program itself is continuous, so creating a continuous loop is unnecessary, so you can get rid of
-the "forever" channel.
-
-The last parameter of this function is a `boolean` specifying whether you want events to be auto acknowledged or not.
-
-If you wish not to auto aknowledge events, then you **must** acknowledge, reject or not acknowledge them manually:
-
-ACK:
+Optionally, you can set the message's `Priorty` and `DeliveryMode` via the `PublishWithOptions` method.
 
 ```go
-// if multiple is true, all previously unacknowledged events will also be acknowledged.
-message.Ack(multiple bool)
+options := gorabbit.SendOptions()
+    .SetPriority(gorabbit.PriorityMedium)
+    .SetDeliveryMode(gorabbit.Persistent)
+
+err := client.PublishWithOptions("events_exchange", "event.foo.bar.created", "foo string", options)
 ```
-
-```go
-for m := range messages {
-log.Printf("Received message: %s", m.Body)
-err = m.Ack(false)
-
-if err != nil {
-log.Fatal("could not acknowledge delivery")
-}
-}
-```
-
-NACK:
-
-```go
-// if multiple is true, all previously unacknowledged events will also be acknowledged.
-// if requeue is true, the "nacked" event will be resent to the queue.
-message.Nack(multiple bool, requeue bool)
-```
-
-```go
-for m := range messages {
-log.Printf("Received message: %s", m.Body)
-err = m.Nack(false, true)
-
-if err != nil {
-log.Fatal("could not nack delivery")
-}
-}
-```
-
-REJECT:
-
-```go
-// if requeue is true, the rejected event will be resent to the queue.
-message.Reject(requeue bool)
-```
-
-```go
-for m := range messages {
-log.Printf("Received message: %s", m.Body)
-err = m.Reject(true)
-
-if err != nil {
-log.Fatal("could not reject delivery")
-}
-}
-```
-
-## Failed Messages Retry Strategy
-
-When one or more message fails to process, you can requeue them a given number
-of times (maximum retry indicator). The message(s) will be re-sent to the same queue
-with the same properties and payload, but with an updated `x-redelivered-count` header
-that will be incremented on each `retry`. When the message reaches the maximum given number
-of retries, it will be rejected and dropped.
-
-You can use the retry functionnality via the client's integrated `RetryMessage` method:
-
-```go
-client.RetryMessage(&message, 5)
-```
-
-In that example, `5` is the maximum number of times a message can be redelivered.
-When that limit is reached, the message will be rejected and dropped.
 
 ## Launch Local RabbitMQ Server
 

@@ -85,10 +85,10 @@ func NewClient(options *ClientOptions) MQTTClient {
 	}
 
 	client := &mqttClient{
-		Host:     options.host,
-		Port:     options.port,
-		Username: options.username,
-		Password: options.password,
+		Host:     options.Host,
+		Port:     options.Port,
+		Username: options.Username,
+		Password: options.Password,
 	}
 
 	// We check if the disabled flag is present, which will completely disable the MQTTClient.
@@ -105,10 +105,10 @@ func NewClient(options *ClientOptions) MQTTClient {
 	// We check if the mode was overwritten with the environment variable "GORABBIT_MODE".
 	if modeOverride := os.Getenv("GORABBIT_MODE"); modeOverride != "" && isValidMode(modeOverride) {
 		// We override the mode only if it is valid
-		options.mode = modeOverride
+		options.Mode = modeOverride
 	}
 
-	switch options.mode {
+	switch options.Mode {
 	case Debug:
 		// If the mode is Debug, we want to actually log important events.
 		client.logger = &stdLogger{}
@@ -124,11 +124,11 @@ func NewClient(options *ClientOptions) MQTTClient {
 	client.connectionManager = newManager(
 		client.ctx,
 		dialURL,
-		options.keepAlive,
-		options.retryDelay,
-		options.maxRetry,
-		options.publishingCacheSize,
-		options.publishingCacheTTL,
+		options.KeepAlive,
+		options.RetryDelay,
+		options.MaxRetry,
+		options.PublishingCacheSize,
+		options.PublishingCacheTTL,
 		client.logger,
 	)
 
