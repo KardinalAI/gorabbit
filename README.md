@@ -380,7 +380,7 @@ err := manager.CreateQueue(gorabbit.QueueConfig{
 })
 ```
 
-### Binding creation
+#### Binding creation
 
 Binds a queue to an exchange via a given routing key.
 
@@ -388,7 +388,7 @@ Binds a queue to an exchange via a given routing key.
 err := manager.BindExchangeToQueueViaRoutingKey("events_exchange", "events_queue", "event.toto")
 ```
 
-### Queue messages count
+#### Queue messages count
 
 Returns the number of messages in a queue, or an error if the queue does not exist. This method can also evaluate the
 existence of a queue.
@@ -403,7 +403,7 @@ messageCount, err := manager.GetNumberOfMessages(gorabbit.QueueConfig{
 
 A `QueueConfig` is used due to the nature of the operation.
 
-### Push message
+#### Push message
 
 Pushes a single message to a given exchange.
 
@@ -411,7 +411,7 @@ Pushes a single message to a given exchange.
 err := manager.PushMessageToExchange("events_exchange", "event.toto", "single_message_payload")
 ```
 
-### Pop message
+#### Pop message
 
 Retrieves a single message from a given queue and auto acknowledges it if `autoAck` is set to true.
 
@@ -419,7 +419,7 @@ Retrieves a single message from a given queue and auto acknowledges it if `autoA
 message, err := manager.PopMessageFromQueue("events_queue", true)
 ```
 
-### Purge queue
+#### Purge queue
 
 Deletes all messages from a given queue.
 
@@ -427,7 +427,7 @@ Deletes all messages from a given queue.
 err := manager.PurgeQueue("events_queue")
 ```
 
-### Delete queue
+#### Delete queue
 
 Deletes a given queue.
 
@@ -435,7 +435,7 @@ Deletes a given queue.
 err := manager.DeleteQueue("events_queue")
 ```
 
-### Delete exchange
+#### Delete exchange
 
 Deletes a given exchange.
 
