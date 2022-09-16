@@ -75,6 +75,12 @@ The client and manager can also be completely disabled via the following environ
 GORABBIT_DISABLED: true     # possible values: true, false, 1, or 0 
 ```
 
+## Always-on mechanism
+
+Here is a visual representation of the always-on mechanism of a connection and channel when the `KeepAlive` flag is set to true.
+
+![Always on mechanism](assets/always-on-mechanism.png)
+
 ## Client
 
 The gorabbit client offers 2 main functionalities:
@@ -210,6 +216,8 @@ err := client.PublishWithOptions("events_exchange", "event.foo.bar.created", "fo
 > :information_source: If the `KeepAlive` flag is set to true when initializing the client, failed publishing will be
 > cached once
 > and re-published as soon as the channel is back up.
+> 
+> ![publishing safeguard](assets/publishing-safeguard.png)
 
 ### Consuming
 
@@ -248,6 +256,8 @@ err := client.RegisterConsumer(gorabbit.MessageConsumer{
 > This mechanism is indefinite and therefore, consuming from a non-existent queue will trigger an error repeatedly but
 > will not affect
 > other consumptions. This is because each consumer has its **own channel**.
+>
+> ![consumer safeguard](assets/consumer-safeguard.png)
 
 ## Manager
 
