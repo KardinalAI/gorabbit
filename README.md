@@ -8,6 +8,7 @@ This wrapper depends on the official [Go RabbitMQ plugin](https://github.com/rab
     * [Go Module](#go-module)
     * [Issues](#possible-issues)
     * [Environment Variables](#environment-variables)
+* [Always On Mechanism](#always-on-mechanism)
 * [Client](#client)
     * [Initialisation](#client-initialization)
     * [Options](#client-options)
