@@ -6,17 +6,20 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Logger is the interface that defines log methods.
-type Logger interface {
-	WithField(string, interface{}) Logger
+type logField struct {
+	Key   string
+	Value interface{}
+}
 
-	Error(error, string)
+// logger is the interface that defines log methods.
+type logger interface {
+	Error(error, string, ...logField)
 
-	Warn(string)
+	Warn(string, ...logField)
 
-	Info(string)
+	Info(string, ...logField)
 
-	Debug(string)
+	Debug(string, ...logField)
 }
 
 // stdLogger logs to stdout using logrus (https://github.com/sirupsen/logrus).
@@ -26,7 +29,7 @@ type stdLogger struct {
 	logFields  map[string]interface{}
 }
 
-func newStdLogger() Logger {
+func newStdLogger() logger {
 	return &stdLogger{
 		logger:     newLogrus(),
 		identifier: libraryName,
@@ -34,43 +37,83 @@ func newStdLogger() Logger {
 	}
 }
 
-func (l stdLogger) WithField(key string, value interface{}) Logger {
-	l.logger.WithField(key, value)
+func (l stdLogger) Error(err error, s string, fields ...logField) {
+	log := l.logger.WithField("library", l.identifier)
 
-	return l
+	extraFields := make(map[string]interface{})
+
+	for k, field := range l.logFields {
+		extraFields[k] = field
+	}
+
+	for _, extraField := range fields {
+		extraFields[extraField.Key] = extraField.Value
+	}
+
+	log.WithFields(extraFields).WithError(err).Error(s)
 }
 
-func (l stdLogger) Error(err error, s string) {
-	l.logger.WithField("library", l.identifier).WithFields(l.logFields).WithError(err).Error(s)
+func (l stdLogger) Warn(s string, fields ...logField) {
+	log := l.logger.WithField("library", l.identifier)
+
+	extraFields := make(map[string]interface{})
+
+	for k, field := range l.logFields {
+		extraFields[k] = field
+	}
+
+	for _, extraField := range fields {
+		extraFields[extraField.Key] = extraField.Value
+	}
+
+	log.WithFields(extraFields).Warn(s)
 }
 
-func (l stdLogger) Warn(s string) {
-	l.logger.WithField("library", l.identifier).WithFields(l.logFields).Warn(s)
+func (l stdLogger) Info(s string, fields ...logField) {
+	log := l.logger.WithField("library", l.identifier)
+
+	extraFields := make(map[string]interface{})
+
+	for k, field := range l.logFields {
+		extraFields[k] = field
+	}
+
+	for _, extraField := range fields {
+		extraFields[extraField.Key] = extraField.Value
+	}
+
+	log.WithFields(extraFields).Info(s)
 }
 
-func (l stdLogger) Info(s string) {
-	l.logger.WithField("library", l.identifier).WithFields(l.logFields).Info(s)
-}
+func (l stdLogger) Debug(s string, fields ...logField) {
+	log := l.logger.WithField("library", l.identifier)
 
-func (l stdLogger) Debug(s string) {
-	l.logger.WithField("library", l.identifier).WithFields(l.logFields).Debug(s)
+	extraFields := make(map[string]interface{})
+
+	for k, field := range l.logFields {
+		extraFields[k] = field
+	}
+
+	for _, extraField := range fields {
+		extraFields[extraField.Key] = extraField.Value
+	}
+
+	log.WithFields(extraFields).Debug(s)
 }
 
 // noLogger does not log at all, this is the default.
 type noLogger struct{}
 
-func (l noLogger) WithField(key string, value interface{}) Logger { return l }
+func (l noLogger) Error(err error, s string, fields ...logField) {}
 
-func (l noLogger) Error(err error, s string) {}
+func (l noLogger) Warn(s string, fields ...logField) {}
 
-func (l noLogger) Warn(s string) {}
+func (l noLogger) Info(s string, fields ...logField) {}
 
-func (l noLogger) Info(s string) {}
-
-func (l noLogger) Debug(s string) {}
+func (l noLogger) Debug(s string, fields ...logField) {}
 
 func newLogrus() *logrus.Logger {
-	logger := &logrus.Logger{
+	log := &logrus.Logger{
 		Out: os.Stdout,
 		Formatter: &logrus.JSONFormatter{
 			DisableTimestamp: true,
@@ -82,14 +125,14 @@ func newLogrus() *logrus.Logger {
 	if logLevel != "" {
 		lvl, err := logrus.ParseLevel(logLevel)
 		if err == nil {
-			logger.Level = lvl
+			log.Level = lvl
 		}
 	}
 
-	return logger
+	return log
 }
 
-func inheritLogger(parent Logger, logFields map[string]interface{}) Logger {
+func inheritLogger(parent logger, logFields map[string]interface{}) logger {
 	switch v := parent.(type) {
 	case *stdLogger:
 		return &stdLogger{

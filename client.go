@@ -60,7 +60,7 @@ type mqttClient struct {
 	Password string
 
 	// logger defines the logger used, depending on the mode set.
-	logger Logger
+	logger logger
 
 	// disabled completely disables the client if true.
 	disabled bool

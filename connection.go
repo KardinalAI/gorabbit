@@ -40,7 +40,7 @@ type amqpConnection struct {
 	publishingCacheTTL time.Duration
 
 	// logger logs events.
-	logger Logger
+	logger logger
 
 	// connectionType defines the connectionType.
 	connectionType connectionType
@@ -52,7 +52,7 @@ type amqpConnection struct {
 //   - keepAlive will keep the connection alive if true.
 //   - retryDelay defines the delay between each re-connection, if the keepAlive flag is set to true.
 //   - logger is the parent logger.
-func newConsumerConnection(ctx context.Context, uri string, keepAlive bool, retryDelay time.Duration, logger Logger) *amqpConnection {
+func newConsumerConnection(ctx context.Context, uri string, keepAlive bool, retryDelay time.Duration, logger logger) *amqpConnection {
 	return newConnection(ctx, uri, keepAlive, retryDelay, logger, connectionTypeConsumer)
 }
 
@@ -65,7 +65,7 @@ func newConsumerConnection(ctx context.Context, uri string, keepAlive bool, retr
 //   - publishingCacheSize defines the maximum length of failed publishing cache.
 //   - publishingCacheTTL defines the time to live for failed publishing in cache.
 //   - logger is the parent logger.
-func newPublishingConnection(ctx context.Context, uri string, keepAlive bool, retryDelay time.Duration, maxRetry uint, publishingCacheSize uint64, publishingCacheTTL time.Duration, logger Logger) *amqpConnection {
+func newPublishingConnection(ctx context.Context, uri string, keepAlive bool, retryDelay time.Duration, maxRetry uint, publishingCacheSize uint64, publishingCacheTTL time.Duration, logger logger) *amqpConnection {
 	conn := newConnection(ctx, uri, keepAlive, retryDelay, logger, connectionTypePublisher)
 
 	conn.maxRetry = maxRetry
@@ -81,7 +81,7 @@ func newPublishingConnection(ctx context.Context, uri string, keepAlive bool, re
 //   - keepAlive will keep the connection alive if true.
 //   - retryDelay defines the delay between each re-connection, if the keepAlive flag is set to true.
 //   - logger is the parent logger.
-func newConnection(ctx context.Context, uri string, keepAlive bool, retryDelay time.Duration, logger Logger, connectionType connectionType) *amqpConnection {
+func newConnection(ctx context.Context, uri string, keepAlive bool, retryDelay time.Duration, logger logger, connectionType connectionType) *amqpConnection {
 	conn := &amqpConnection{
 		ctx:        ctx,
 		uri:        uri,
@@ -95,7 +95,7 @@ func newConnection(ctx context.Context, uri string, keepAlive bool, retryDelay t
 		connectionType: connectionType,
 	}
 
-	conn.logger.WithField("uri", uri).Debug("Initializing new amqp connection")
+	conn.logger.Debug("Initializing new amqp connection", logField{Key: "uri", Value: uri})
 
 	// We open an initial connection.
 	err := conn.open()
@@ -115,7 +115,7 @@ func (a *amqpConnection) open() error {
 		return errEmptyURI
 	}
 
-	a.logger.WithField("uri", a.uri).Debug("Connecting to RabbitMQ server")
+	a.logger.Debug("Connecting to RabbitMQ server", logField{Key: "uri", Value: a.uri})
 
 	// We request a connection from the RabbitMQ server.
 	conn, err := amqp.Dial(a.uri)
@@ -125,7 +125,7 @@ func (a *amqpConnection) open() error {
 		return err
 	}
 
-	a.logger.WithField("uri", a.uri).Info("Connection successful")
+	a.logger.Info("Connection successful", logField{Key: "uri", Value: a.uri})
 
 	a.connection = conn
 
@@ -190,7 +190,7 @@ func (a *amqpConnection) guard() {
 			}
 
 			if err != nil {
-				a.logger.WithField("reason", err.Reason).WithField("code", err.Code).Warn("Connection lost")
+				a.logger.Warn("Connection lost", logField{Key: "reason", Value: err.Reason}, logField{Key: "code", Value: err.Code})
 			}
 
 			// If the connection was explicitly closed, we do not want to re-connect.
@@ -258,7 +258,7 @@ func (a *amqpConnection) registerConsumer(consumer MessageConsumer) error {
 		if channel.consumer != nil && channel.consumer.Queue == consumer.Queue {
 			err := errConsumerAlreadyExists
 
-			a.logger.WithField("consumer", consumer.Name).Error(err, "Could not register consumer")
+			a.logger.Error(err, "Could not register consumer", logField{Key: "consumer", Value: consumer.Name})
 
 			return err
 		}
@@ -268,7 +268,7 @@ func (a *amqpConnection) registerConsumer(consumer MessageConsumer) error {
 
 	a.channels = append(a.channels, channel)
 
-	a.logger.WithField("consumer", consumer.Name).Info("Consumer registered")
+	a.logger.Info("Consumer registered", logField{Key: "consumer", Value: consumer.Name})
 
 	return nil
 }

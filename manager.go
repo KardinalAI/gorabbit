@@ -70,7 +70,7 @@ type mqttManager struct {
 	Password string
 
 	// logger defines the logger used, depending on the mode set.
-	logger Logger
+	logger logger
 
 	// disabled completely disables the client if true.
 	disabled bool
@@ -117,7 +117,7 @@ func NewManager(options *ManagerOptions) (MQTTManager, error) {
 	switch options.mode {
 	case Debug:
 		// If the mode is Debug, we want to actually log important events.
-		client.logger = &stdLogger{}
+		client.logger = newStdLogger()
 	default:
 		// Otherwise, we do not want any logs coming from the library.
 		client.logger = &noLogger{}

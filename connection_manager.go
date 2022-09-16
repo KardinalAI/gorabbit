@@ -14,7 +14,7 @@ type connectionManager struct {
 	publisherConnection *amqpConnection
 
 	// logger is passed from the client for debugging purposes.
-	logger Logger
+	logger logger
 }
 
 // newManager instantiates a new connectionManager with given arguments.
@@ -26,7 +26,7 @@ func newManager(
 	maxRetry uint,
 	publishingCacheSize uint64,
 	publishingCacheTTL time.Duration,
-	logger Logger,
+	logger logger,
 ) *connectionManager {
 	c := &connectionManager{
 		consumerConnection:  newConsumerConnection(ctx, uri, keepAlive, retryDelay, logger),
