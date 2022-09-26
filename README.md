@@ -10,7 +10,7 @@ This wrapper depends on the official [Go RabbitMQ plugin](https://github.com/rab
     * [Environment Variables](#environment-variables)
 * [Always On Mechanism](#always-on-mechanism)
 * [Client](#client)
-    * [Initialisation](#client-initialization)
+    * [Initialization](#client-initialization)
     * [Options](#client-options)
     * [Default Options](#client-with-default-options)
     * [Custom Options](#client-with-custom-options)
@@ -20,7 +20,7 @@ This wrapper depends on the official [Go RabbitMQ plugin](https://github.com/rab
     * [Publishing](#publishing)
     * [Consuming](#consuming)
 * [Manager](#manager)
-    * [Initialisation](#manager-initialization)
+    * [Initialization](#manager-initialization)
     * [Options](#manager-options)
     * [Default Options](#manager-with-default-options)
     * [Custom Options](#manager-with-custom-options)
@@ -141,10 +141,10 @@ We can input custom values for a specific property, either via the built-in buil
 `NewClientOptions()` and `DefaultClientOptions()` both return an instance of `*ClientOptions` that can act as a builder.
 
 ```go
-options := gorabbit.NewClientOptions()
-    .SetMode(gorabbit.Debug)
-    .SetCredentials("root", "password")
-    .SetRetryDelay(5 * time.Second)
+options := gorabbit.NewClientOptions().
+    SetMode(gorabbit.Debug).
+    SetCredentials("root", "password").
+    SetRetryDelay(5 * time.Second)
 
 client := gorabbit.NewClient(options)
 ```
@@ -156,11 +156,11 @@ client := gorabbit.NewClient(options)
 `ClientOptions` is an exported type, so it can be used directly.
 
 ```go
-options := gorabbit.ClentOptions {
+options := gorabbit.ClientOptions {
     Host:     "localhost",
     Port:     5673,
     Username: "root",
-    Password: "password"
+    Password: "password",
     ...
 }
 
@@ -207,9 +207,9 @@ err := client.Publish("events_exchange", "event.foo.bar.created", foo{Action: "b
 Optionally, you can set the message's `Priorty` and `DeliveryMode` via the `PublishWithOptions` method.
 
 ```go
-options := gorabbit.SendOptions()
-    .SetPriority(gorabbit.PriorityMedium)
-    .SetDeliveryMode(gorabbit.Persistent)
+options := gorabbit.SendOptions().
+    SetPriority(gorabbit.PriorityMedium).
+    SetDeliveryMode(gorabbit.Persistent)
 
 err := client.PublishWithOptions("events_exchange", "event.foo.bar.created", "foo string", options)
 ```
@@ -318,9 +318,9 @@ We can input custom values for a specific property, either via the built-in buil
 builder.
 
 ```go
-options := gorabbit.NewManagerOptions()
-    .SetMode(gorabbit.Debug)
-    .SetCredentials("root", "password")
+options := gorabbit.NewManagerOptions().
+    SetMode(gorabbit.Debug).
+    SetCredentials("root", "password")
 
 manager := gorabbit.NewManager(options)
 ```
