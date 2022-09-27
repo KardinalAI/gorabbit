@@ -90,11 +90,12 @@ func NewManager(options *ManagerOptions) (MQTTManager, error) {
 		options = DefaultManagerOptions()
 	}
 
-	client := &mqttManager{
+	manager := &mqttManager{
 		Host:     options.host,
 		Port:     options.port,
 		Username: options.username,
 		Password: options.password,
+		logger:   &noLogger{},
 	}
 
 	// We check if the disabled flag is present, which will completely disable the MQTTClient.
@@ -102,42 +103,38 @@ func NewManager(options *ManagerOptions) (MQTTManager, error) {
 		isDisabled := disabledOverride == "1" || disabledOverride == "true"
 
 		if isDisabled {
-			client.disabled = true
+			manager.disabled = true
 
-			return client, nil
+			return manager, nil
 		}
 	}
 
 	// We check if the mode was overwritten with the environment variable "GORABBIT_MODE".
-	if modeOverride := os.Getenv("GORABBIT_MODE"); modeOverride != "" && isValidMode(modeOverride) {
+	if modeOverride := os.Getenv("GORABBIT_MODE"); isValidMode(modeOverride) {
 		// We override the mode only if it is valid
 		options.mode = modeOverride
 	}
 
-	switch options.mode {
-	case Debug:
+	if options.mode == Debug {
 		// If the mode is Debug, we want to actually log important events.
-		client.logger = newStdLogger()
-	default:
-		// Otherwise, we do not want any logs coming from the library.
-		client.logger = &noLogger{}
+		manager.logger = newStdLogger()
 	}
 
-	dialURL := fmt.Sprintf("amqp://%s:%s@%s:%d/", client.Username, client.Password, client.Host, client.Port)
+	dialURL := fmt.Sprintf("amqp://%s:%s@%s:%d/", manager.Username, manager.Password, manager.Host, manager.Port)
 
 	var err error
 
-	client.connection, err = amqp.Dial(dialURL)
+	manager.connection, err = amqp.Dial(dialURL)
 	if err != nil {
-		return client, err
+		return manager, err
 	}
 
-	client.channel, err = client.connection.Channel()
+	manager.channel, err = manager.connection.Channel()
 	if err != nil {
-		return client, err
+		return manager, err
 	}
 
-	return client, nil
+	return manager, nil
 }
 
 func (manager *mqttManager) Disconnect() error {

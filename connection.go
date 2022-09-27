@@ -230,12 +230,12 @@ func (a *amqpConnection) close() error {
 	return nil
 }
 
-// ready returns true of the connection exists and is not closed.
+// ready returns true if the connection exists and is not closed.
 func (a *amqpConnection) ready() bool {
 	return a.connection != nil && !a.connection.IsClosed()
 }
 
-// healthy returns true of the connection exists, is not closed and all child channels are healthy.
+// healthy returns true if the connection exists, is not closed and all child channels are healthy.
 func (a *amqpConnection) healthy() bool {
 	// If the connection is not ready, return false.
 	if !a.ready() {

@@ -89,32 +89,27 @@ func NewClient(options *ClientOptions) MQTTClient {
 		Port:     options.Port,
 		Username: options.Username,
 		Password: options.Password,
+		logger:   &noLogger{},
 	}
 
 	// We check if the disabled flag is present, which will completely disable the MQTTClient.
 	if disabledOverride := os.Getenv("GORABBIT_DISABLED"); disabledOverride != "" {
-		isDisabled := disabledOverride == "1" || disabledOverride == "true"
-
-		if isDisabled {
+		switch disabledOverride {
+		case "1", "true":
 			client.disabled = true
-
 			return client
 		}
 	}
 
 	// We check if the mode was overwritten with the environment variable "GORABBIT_MODE".
-	if modeOverride := os.Getenv("GORABBIT_MODE"); modeOverride != "" && isValidMode(modeOverride) {
+	if modeOverride := os.Getenv("GORABBIT_MODE"); isValidMode(modeOverride) {
 		// We override the mode only if it is valid
 		options.Mode = modeOverride
 	}
 
-	switch options.Mode {
-	case Debug:
+	if options.Mode == Debug {
 		// If the mode is Debug, we want to actually log important events.
 		client.logger = newStdLogger()
-	default:
-		// Otherwise, we do not want any logs coming from the library.
-		client.logger = &noLogger{}
 	}
 
 	client.ctx, client.cancel = context.WithCancel(context.Background())
