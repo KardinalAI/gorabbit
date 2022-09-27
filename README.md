@@ -186,7 +186,7 @@ publishing are:
 
 * Exchange (which exchange the message should be sent to)
 * Routing Key
-* Payload (`interface{}`, the object will be unmarshalled internally)
+* Payload (`interface{}`, the object will be marshalled internally)
 
 Example of sending a simple string
 
@@ -204,7 +204,7 @@ type foo struct {
 err := client.Publish("events_exchange", "event.foo.bar.created", foo{Action: "bar"})
 ```
 
-Optionally, you can set the message's `Priorty` and `DeliveryMode` via the `PublishWithOptions` method.
+Optionally, you can set the message's `Priority` and `DeliveryMode` via the `PublishWithOptions` method.
 
 ```go
 options := gorabbit.SendOptions().
@@ -235,12 +235,12 @@ err := client.RegisterConsumer(gorabbit.MessageConsumer{
 	AutoAck:           false,
 	ConcurrentProcess: false,
 	Handlers: gorabbit.MQTTMessageHandlers{
-		"event.toto": func (payload []byte) error {
+		"event.foo.bar.created": func (payload []byte) error {
 			fmt.Println(string(payload))
 			
 			return nil
 		},
-    },
+	},
 })
 ```
 
@@ -336,8 +336,8 @@ options := gorabbit.ManagerOptions {
     Host:     "localhost",
     Port:     5673,
     Username: "root",
-    Password: "password"
-    Mode:     gorabbit.Debug
+    Password: "password",
+    Mode:     gorabbit.Debug,
 }
 
 manager := gorabbit.NewManager(&options)
@@ -357,7 +357,7 @@ defer manager.Disconnect()
 
 ### Manager operations
 
-The manager offers all necessary operation to manager a RabbitMQ server.
+The manager offers all necessary operations to manager a RabbitMQ server.
 
 #### Exchange creation
 
@@ -384,7 +384,7 @@ err := manager.CreateQueue(gorabbit.QueueConfig{
     Args:      nil,
     Bindings: &[]gorabbit.BindingConfig{
         {
-            RoutingKey: "event.toto",
+            RoutingKey: "event.foo.bar.created",
             Exchange:   "events_exchange",
         },
     },
@@ -396,7 +396,7 @@ err := manager.CreateQueue(gorabbit.QueueConfig{
 Binds a queue to an exchange via a given routing key.
 
 ```go
-err := manager.BindExchangeToQueueViaRoutingKey("events_exchange", "events_queue", "event.toto")
+err := manager.BindExchangeToQueueViaRoutingKey("events_exchange", "events_queue", "event.foo.bar.created")
 ```
 
 #### Queue messages count
@@ -409,7 +409,7 @@ messageCount, err := manager.GetNumberOfMessages(gorabbit.QueueConfig{
     Name:      "events_queue",
     Durable:   false,
     Exclusive: false,
-)
+})
 ```
 
 A `QueueConfig` is used due to the nature of the operation.
@@ -419,7 +419,7 @@ A `QueueConfig` is used due to the nature of the operation.
 Pushes a single message to a given exchange.
 
 ```go
-err := manager.PushMessageToExchange("events_exchange", "event.toto", "single_message_payload")
+err := manager.PushMessageToExchange("events_exchange", "event.foo.bar.created", "single_message_payload")
 ```
 
 #### Pop message
@@ -463,4 +463,4 @@ docker run -it --rm --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-manag
 ```
 
 It will launch a local RabbitMQ server mapped on port 5672, and the management dashboard will be mapped on
-port 15672 accessible on localhost:15672 with a username "guest" and password "guest"
+port 15672 accessible on localhost:15672 with a username "guest" and password "guest".
