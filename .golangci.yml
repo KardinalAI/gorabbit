@@ -273,7 +273,7 @@ linters:
     - exhaustive
     - exportloopref
     - funlen
-    # - gochecknoglobals
+    - gochecknoglobals
     - gochecknoinits
     # - gocognit # NEED
     - goconst
