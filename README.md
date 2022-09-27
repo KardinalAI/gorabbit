@@ -78,7 +78,8 @@ GORABBIT_DISABLED: true     # possible values: true, false, 1, or 0
 
 ## Always-on mechanism
 
-Here is a visual representation of the always-on mechanism of a connection and channel when the `KeepAlive` flag is set to true.
+Here is a visual representation of the always-on mechanism of a connection and channel when the `KeepAlive` flag is set
+to true.
 
 ![Always on mechanism](assets/always-on-mechanism.png)
 
@@ -217,7 +218,7 @@ err := client.PublishWithOptions("events_exchange", "event.foo.bar.created", "fo
 > :information_source: If the `KeepAlive` flag is set to true when initializing the client, failed publishing will be
 > cached once
 > and re-published as soon as the channel is back up.
-> 
+>
 > ![publishing safeguard](assets/publishing-safeguard.png)
 
 ### Consuming
@@ -228,19 +229,19 @@ consumer.
 
 ```go
 err := client.RegisterConsumer(gorabbit.MessageConsumer{
-	Queue:             "events_queue",
-	Name:              "toto_consumer",
-	PrefetchSize:      0,
-	PrefetchCount:     10,
-	AutoAck:           false,
-	ConcurrentProcess: false,
-	Handlers: gorabbit.MQTTMessageHandlers{
-		"event.foo.bar.created": func (payload []byte) error {
-			fmt.Println(string(payload))
-			
-			return nil
-		},
-	},
+    Queue:             "events_queue",
+    Name:              "toto_consumer",
+    PrefetchSize:      0,
+    PrefetchCount:     10,
+    AutoAck:           false,
+    ConcurrentProcess: false,
+    Handlers: gorabbit.MQTTMessageHandlers{
+        "event.foo.bar.created": func (payload []byte) error {
+            fmt.Println(string(payload))
+
+            return nil
+        },
+    },
 })
 ```
 
