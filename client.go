@@ -116,7 +116,7 @@ func NewClient(options *ClientOptions) MQTTClient {
 
 	dialURL := fmt.Sprintf("amqp://%s:%s@%s:%d/", client.Username, client.Password, client.Host, client.Port)
 
-	client.connectionManager = newManager(
+	client.connectionManager = newConnectionManager(
 		client.ctx,
 		dialURL,
 		options.KeepAlive,

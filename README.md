@@ -268,7 +268,7 @@ The client offers `IsReady()` and `IsHealthy()` checks that can be used for moni
 
 **Ready:** Verifies that connections are opened and ready to launch new operations.
 
-**Healthy** Verifies that both connections and channels are opened, ready and ongoing operations are working 
+**Healthy:** Verifies that both connections and channels are opened, ready and ongoing operations are working 
 (Consumers are consuming).
 
 ## Manager
