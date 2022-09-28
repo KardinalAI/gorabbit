@@ -416,14 +416,8 @@ Returns the number of messages in a queue, or an error if the queue does not exi
 existence of a queue.
 
 ```go
-messageCount, err := manager.GetNumberOfMessages(gorabbit.QueueConfig{
-    Name:      "events_queue",
-    Durable:   false,
-    Exclusive: false,
-})
+messageCount, err := manager.GetNumberOfMessages("events_queue")
 ```
-
-A `QueueConfig` is used due to the nature of the operation.
 
 #### Push message
 

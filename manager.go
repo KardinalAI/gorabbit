@@ -33,7 +33,7 @@ type MQTTManager interface {
 
 	// GetNumberOfMessages retrieves the number of messages currently sitting in a given queue.
 	// Returns an error if the connection to the RabbitMQ server is down or the queue does not exist.
-	GetNumberOfMessages(config QueueConfig) (int, error)
+	GetNumberOfMessages(queue string) (int, error)
 
 	// PushMessageToExchange pushes a message to a given exchange with a given routing key.
 	// Returns an error if the connection to the RabbitMQ server is down or the exchange does not exist.
@@ -242,7 +242,7 @@ func (manager *mqttManager) BindExchangeToQueueViaRoutingKey(exchange, queue, ro
 	)
 }
 
-func (manager *mqttManager) GetNumberOfMessages(config QueueConfig) (int, error) {
+func (manager *mqttManager) GetNumberOfMessages(queue string) (int, error) {
 	// Manager is disabled, so we do nothing and return no error.
 	if manager.disabled {
 		return -1, nil
@@ -255,10 +255,10 @@ func (manager *mqttManager) GetNumberOfMessages(config QueueConfig) (int, error)
 
 	// We passively declare the queue via the channel, this will return the existing queue or an error if it doesn't exist.
 	q, err := manager.channel.QueueDeclarePassive(
-		config.Name,
-		config.Durable,
+		queue,
 		false,
-		config.Exclusive,
+		false,
+		false,
 		false,
 		nil,
 	)
