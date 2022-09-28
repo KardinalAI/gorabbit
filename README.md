@@ -19,6 +19,7 @@ This wrapper depends on the official [Go RabbitMQ plugin](https://github.com/rab
     * [Disconnection](#client-disconnection)
     * [Publishing](#publishing)
     * [Consuming](#consuming)
+    * [Ready and Health Checks](#ready-and-health-checks)
 * [Manager](#manager)
     * [Initialization](#manager-initialization)
     * [Options](#manager-options)
@@ -260,6 +261,15 @@ err := client.RegisterConsumer(gorabbit.MessageConsumer{
 > other consumptions. This is because each consumer has its **own channel**.
 >
 > ![consumer safeguard](assets/consumer-safeguard.png)
+
+### Ready and Health checks
+
+The client offers `IsReady()` and `IsHealthy()` checks that can be used for monitoring.
+
+**Ready:** Verifies that connections are opened and ready to launch new operations.
+
+**Healthy** Verifies that both connections and channels are opened, ready and ongoing operations are working 
+(Consumers are consuming).
 
 ## Manager
 

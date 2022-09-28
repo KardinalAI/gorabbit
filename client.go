@@ -131,12 +131,7 @@ func NewClient(options *ClientOptions) MQTTClient {
 }
 
 func (client *mqttClient) Publish(exchange string, routingKey string, payload interface{}) error {
-	// client is disabled, so we do nothing and return no error.
-	if client.disabled {
-		return nil
-	}
-
-	return client.connectionManager.publish(exchange, routingKey, payload, nil)
+	return client.PublishWithOptions(exchange, routingKey, payload, nil)
 }
 
 func (client *mqttClient) PublishWithOptions(exchange string, routingKey string, payload interface{}, options *publishingOptions) error {
