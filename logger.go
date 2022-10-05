@@ -37,9 +37,7 @@ func newStdLogger() logger {
 	}
 }
 
-func (l stdLogger) Error(err error, s string, fields ...logField) {
-	log := l.logger.WithField("library", l.identifier)
-
+func (l stdLogger) getExtraFields(fields []logField) map[string]interface{} {
 	extraFields := make(map[string]interface{})
 
 	for k, field := range l.logFields {
@@ -49,6 +47,14 @@ func (l stdLogger) Error(err error, s string, fields ...logField) {
 	for _, extraField := range fields {
 		extraFields[extraField.Key] = extraField.Value
 	}
+
+	return extraFields
+}
+
+func (l stdLogger) Error(err error, s string, fields ...logField) {
+	log := l.logger.WithField("library", l.identifier)
+
+	extraFields := l.getExtraFields(fields)
 
 	log.WithFields(extraFields).WithError(err).Error(s)
 }
@@ -56,15 +62,7 @@ func (l stdLogger) Error(err error, s string, fields ...logField) {
 func (l stdLogger) Warn(s string, fields ...logField) {
 	log := l.logger.WithField("library", l.identifier)
 
-	extraFields := make(map[string]interface{})
-
-	for k, field := range l.logFields {
-		extraFields[k] = field
-	}
-
-	for _, extraField := range fields {
-		extraFields[extraField.Key] = extraField.Value
-	}
+	extraFields := l.getExtraFields(fields)
 
 	log.WithFields(extraFields).Warn(s)
 }
@@ -72,15 +70,7 @@ func (l stdLogger) Warn(s string, fields ...logField) {
 func (l stdLogger) Info(s string, fields ...logField) {
 	log := l.logger.WithField("library", l.identifier)
 
-	extraFields := make(map[string]interface{})
-
-	for k, field := range l.logFields {
-		extraFields[k] = field
-	}
-
-	for _, extraField := range fields {
-		extraFields[extraField.Key] = extraField.Value
-	}
+	extraFields := l.getExtraFields(fields)
 
 	log.WithFields(extraFields).Info(s)
 }
@@ -88,15 +78,7 @@ func (l stdLogger) Info(s string, fields ...logField) {
 func (l stdLogger) Debug(s string, fields ...logField) {
 	log := l.logger.WithField("library", l.identifier)
 
-	extraFields := make(map[string]interface{})
-
-	for k, field := range l.logFields {
-		extraFields[k] = field
-	}
-
-	for _, extraField := range fields {
-		extraFields[extraField.Key] = extraField.Value
-	}
+	extraFields := l.getExtraFields(fields)
 
 	log.WithFields(extraFields).Debug(s)
 }

@@ -72,7 +72,7 @@ type mqttManager struct {
 	// logger defines the logger used, depending on the mode set.
 	logger logger
 
-	// disabled completely disables the client if true.
+	// disabled completely disables the manager if true.
 	disabled bool
 
 	// connection holds the single connection to the RabbitMQ server.
@@ -85,7 +85,7 @@ type mqttManager struct {
 // NewManager will instantiate a new MQTTManager.
 // If options is set to nil, the DefaultManagerOptions will be used.
 func NewManager(options *ManagerOptions) (MQTTManager, error) {
-	// If no options is passed, we use the DefaultClientOptions.
+	// If no options is passed, we use the DefaultManagerOptions.
 	if options == nil {
 		options = DefaultManagerOptions()
 	}
@@ -98,13 +98,11 @@ func NewManager(options *ManagerOptions) (MQTTManager, error) {
 		logger:   &noLogger{},
 	}
 
-	// We check if the disabled flag is present, which will completely disable the MQTTClient.
+	// We check if the disabled flag is present, which will completely disable the MQTTManager.
 	if disabledOverride := os.Getenv("GORABBIT_DISABLED"); disabledOverride != "" {
-		isDisabled := disabledOverride == "1" || disabledOverride == "true"
-
-		if isDisabled {
+		switch disabledOverride {
+		case "1", "true":
 			manager.disabled = true
-
 			return manager, nil
 		}
 	}

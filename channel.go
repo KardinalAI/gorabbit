@@ -126,7 +126,7 @@ func newPublishingChannel(ctx context.Context, connection *amqp.Connection, keep
 		retryDelay: retryDelay,
 		logger: inheritLogger(logger, map[string]interface{}{
 			"context": "channel",
-			"type":    connectionTypeConsumer,
+			"type":    connectionTypePublisher,
 		}),
 		connectionType:  connectionTypePublisher,
 		publishingCache: newTTLMap[string, mqttPublishing](publishingCacheSize, publishingCacheTTL),
