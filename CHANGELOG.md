@@ -9,9 +9,9 @@ Official V3 release of Gorabbit with **Breaking Changes**
 * Gorrabit mode can be switched from an environment variable `GORABBIT_MODE`
 * The client and the manager can be initialized with default values
 * The engine behind the client is brand new and more robust
-  * Multi-connection support
-  * Multi-channel support
-  * Strong `keep alive` mechanism if enabled
+    * Multi-connection support
+    * Multi-channel support
+    * Strong `keep alive` mechanism if enabled
 * Better logs with Logrus
 * Added `golangci-lint` linter for a cleaner codebase
 * Every piece of code is now documented
@@ -19,28 +19,29 @@ Official V3 release of Gorabbit with **Breaking Changes**
 **WHAT'S CHANGED**
 
 * The old `MQTTClient` has been split between `MQTTClient` and `MQTTManager`
-  * The `MQTTClient` offers basic client operations: 
-    * Publishing
-    * Consuming
-    * Ready check
-    * Health check
-  * The `MQTTManager` offers management operations for the RabbitMQ server:
-    * Exchange, queue and binding creation
-    * Exchange and queue deletion
-    * Queue purge
-    * Message push, pop and count
+    * The `MQTTClient` offers basic client operations:
+        * Publishing
+        * Consuming
+        * Ready check
+        * Health check
+    * The `MQTTManager` offers management operations for the RabbitMQ server:
+        * Exchange, queue and binding creation
+        * Exchange and queue deletion
+        * Queue purge
+        * Message push, pop and count
 * `ClientConfig` renamed to `ClientOptions` with much more flexibility and customization
 * `SendMessage` method split into 2 new methods:
-  * `Publish` Simpler publishing
-  * `PublishWithOptions` More complex publishing (priority, delivery mode)
-* `SubscribeToMessages` method completely revamped to `RegisterConsumer` and now handles all the following operations internally:
-  * Message retry
-  * Message acknowledgement
-  * Message negative acknowledgement
-  * Message rejection
+    * `Publish` Simpler publishing
+    * `PublishWithOptions` More complex publishing (priority, delivery mode)
+* `SubscribeToMessages` method completely revamped to `RegisterConsumer` and now handles all the following operations
+  internally:
+    * Message retry
+    * Message acknowledgement
+    * Message negative acknowledgement
+    * Message rejection
 * `ReadyCheck` method split into 2 new methods:
-  * `IsReady` The client is ready but ongoing operations may or may not be down
-  * `IsHealthy` The client is ready and all ongoing operations are up and running
+    * `IsReady` The client is ready but ongoing operations may or may not be down
+    * `IsHealthy` The client is ready and all ongoing operations are up and running
 * `SubscriptionHealth` renamed to `consumptionHealth` and no longer exported
 * Most constants now have their own custom types for type-strict declarations
 * Redelivery header renamed from `x-redelivered-count` to `x-death-count`
