@@ -169,7 +169,7 @@ linters-settings:
     ignore-words:
       - "" # default: ""
   nakedret:
-    max-func-lines: 0 # default 30
+    max-func-lines: 30 # default 30
   nestif:
     min-complexity: 4 # default 5
   nilnil:
