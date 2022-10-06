@@ -16,7 +16,7 @@ type QueueConfig struct {
 	Durable   bool                   `yaml:"durable"`
 	Exclusive bool                   `yaml:"exclusive"`
 	Args      map[string]interface{} `yaml:"args"`
-	Bindings  *[]BindingConfig       `yaml:"bindings"`
+	Bindings  []BindingConfig        `yaml:"bindings"`
 }
 
 type BindingConfig struct {

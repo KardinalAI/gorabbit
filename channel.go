@@ -472,7 +472,7 @@ func (c *amqpChannel) retryDelivery(delivery *amqp.Delivery, alreadyAcknowledged
 
 				// We create a new publishing which is a copy of the old one but with a decremented xDeathCountHeader.
 				newPublishing := amqp.Publishing{
-					ContentType:  "text/plain",
+					ContentType:  "application/json",
 					Body:         delivery.Body,
 					Type:         delivery.RoutingKey,
 					Priority:     delivery.Priority,
@@ -505,7 +505,7 @@ func (c *amqpChannel) retryDelivery(delivery *amqp.Delivery, alreadyAcknowledged
 // publish will publish a message with the given configuration.
 func (c *amqpChannel) publish(exchange string, routingKey string, payload []byte, options *publishingOptions) error {
 	publishing := &amqp.Publishing{
-		ContentType:  "text/plain",
+		ContentType:  "application/json",
 		Body:         payload,
 		Type:         routingKey,
 		Priority:     PriorityMedium.Uint8(),

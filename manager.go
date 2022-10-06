@@ -184,7 +184,7 @@ func (manager *mqttManager) CreateQueue(config QueueConfig) error {
 
 	// If bindings are also declared, we create the bindings too.
 	if config.Bindings != nil {
-		for _, binding := range *config.Bindings {
+		for _, binding := range config.Bindings {
 			err = manager.BindExchangeToQueueViaRoutingKey(binding.Exchange, config.Name, binding.RoutingKey)
 
 			if err != nil {
@@ -287,7 +287,7 @@ func (manager *mqttManager) PushMessageToExchange(exchange, routingKey string, p
 
 	// We build the amqp.Publishing object.
 	publishing := amqp.Publishing{
-		ContentType:  "text/plain",
+		ContentType:  "application/json",
 		Body:         payloadBytes,
 		Type:         routingKey,
 		Priority:     PriorityMedium.Uint8(),
