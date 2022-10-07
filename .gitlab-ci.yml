@@ -1,10 +1,25 @@
-image: golang:1.16-stretch
+stages:
+  - test
 
-test:
+TEST-library:
+  before_script:
+    - git config --global url.https://oauth2:"${GITLAB_TOKEN}"@gitlab.kardinal.ai/.insteadOf https://gitlab.kardinal.ai/
+  stage: test
+  image: golang:1.18-stretch
+  script:
+    # go formatting analysis
+    - /bin/sh -c 'if [ -n "$(gofmt -l .)" ]; then gofmt -d .; exit 1; fi'
+    # GO code quality analysis
+    - go vet ./...
+    # GO Unit Testing
+    - go test -race $(go list ./... | grep -v /vendor/) -v -coverprofile=coverage.out
+    - go tool cover -func=coverage.out
+  coverage: /\s+\(statements\)\s+(\d+.\d+\%)/
+
+TEST-lint:
+  stage: test
+  image: golangci/golangci-lint:v1.45-alpine
   before_script:
     - git config --global url.https://oauth2:"${GITLAB_TOKEN}"@gitlab.kardinal.ai/.insteadOf https://gitlab.kardinal.ai/
   script:
-    - if [ -n "$(gofmt -l .)" ]; then gofmt -d .; exit 1; fi
-    - go vet ./...
-    - go test -race $(go list ./... | grep -v /vendor/) -v -coverprofile=coverage.out
-    - go tool cover -func=coverage.out
+    - golangci-lint run -v

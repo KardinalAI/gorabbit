@@ -1,18 +1,88 @@
+# 3.0.0
+
+Official V3 release of Gorabbit with **Breaking Changes**
+
+**WHAT'S NEW**
+
+* Gorabbit now offers a client (`MQTTClient`) and a manager (`MQTTManager`) that each serve a different purpose
+* Gorabbit can be disabled from an environment variable `GORABBIT_DISABLED`
+* Gorrabit mode can be switched from an environment variable `GORABBIT_MODE`
+* The client and the manager can be initialized with default values
+* The engine behind the client is brand new and more robust
+    * Multi-connection support
+    * Multi-channel support
+    * Strong `keep alive` mechanism if enabled
+* Better logs with Logrus
+* Added `golangci-lint` linter for a cleaner codebase
+* Every piece of code is now documented
+
+**WHAT'S CHANGED**
+
+* The old `MQTTClient` has been split between `MQTTClient` and `MQTTManager`
+    * The `MQTTClient` offers basic client operations:
+        * Publishing
+        * Consuming
+        * Ready check
+        * Health check
+    * The `MQTTManager` offers management operations for the RabbitMQ server:
+        * Exchange, queue and binding creation
+        * Exchange and queue deletion
+        * Queue purge
+        * Message push, pop and count
+* `ClientConfig` renamed to `ClientOptions` with much more flexibility and customization
+* `SendMessage` method split into 2 new methods:
+    * `Publish` Simpler publishing
+    * `PublishWithOptions` More complex publishing (priority, delivery mode)
+* `SubscribeToMessages` method completely revamped to `RegisterConsumer` and now handles all the following operations
+  internally:
+    * Message retry
+    * Message acknowledgement
+    * Message negative acknowledgement
+    * Message rejection
+* `ReadyCheck` method split into 2 new methods:
+    * `IsReady` The client is ready but ongoing operations may or may not be down
+    * `IsHealthy` The client is ready and all ongoing operations are up and running
+* `SubscriptionHealth` renamed to `consumptionHealth` and no longer exported
+* Most constants now have their own custom types for type-strict declarations
+* Redelivery header renamed from `x-redelivered-count` to `x-death-count`
+* Updated go to 1.18
+* Better CI scripts
+* Externalized some objects and interfaces in their own file
+
+**WHAT'S REMOVED**
+
+* `ListenStatus` completely removed as it has become unnecessary
+* `RetryMessage` method completely removed as it is handled internally
+* `ConnectionStatus` removed as it is unused
+* Internal `consumed` cache removed as it is no longer necessary
+* `RabbitServerConfig` struct removed as it is unused
+* `AMQPMessage` custom message wrapper removed as it is no longer used
+* `EventsExchange` and `CommandsExchange` constants removed due to being too specific
+
+**WHAT'S FIXED**
+
+* Re-connection sometimes not working due to the buffered channel of `ConnectionStatus` reaching a deadlock.
+* Fixed some typos in comments
+
 # 2.1.0
+
 * Introduced Health Check for failed subscriptions
 * Client `ReadyCheck` method returns readiness and health check
 * New `SubscriptionsHealth` model
 
 # 2.0.0
+
 Official V2 release of Gorabbit
 
 **WHAT'S NEW**
+
 * Introduced a connection manager to handle `amqp.Connection` and `amqp.Channel` management
 * Better reconnection and keep alive logic on channel or connection closed
 * New `ReadyCheck` method that check if everything is up and running
 * New Logging interface
 
 **WHAT'S CHANGED**
+
 * Everything is now handled by `connectionManager`
 * `connectionManager` overwrites amqp channel methods to check for connection status first
 * Removed `logrus` dependency for logging
@@ -20,6 +90,7 @@ Official V2 release of Gorabbit
 * Reduced project files
 
 **BREAKING CHANGES**
+
 * `ClientConfig` now takes a `KeepAlive` boolean attribute instead of `MaxRetry` and `RetryDelay`
 * `NewClient` and `NewClientConfig` no longer return an error
 * `NewClientDebug` no longer takes a `logger` parameter
@@ -27,12 +98,14 @@ Official V2 release of Gorabbit
 * Removed `SetupMQTT` and `SetupMQTTFromYML` methods and logic as their functionalities are fully covered by the client
 
 # 1.4.2
+
 Small bug fixes
 
 * Modified `Ack`, `Nack` and `Reject` methods of `AMQPMessage` to return no error if already consumed
 * Modified `PopMessageFromQueue` method to cache auth acknowledged message
 
 # 1.4.1
+
 Migration from https://github.com/streadway/amqp to https://github.com/rabbitmq/amqp091-go
 
 * Replaced `"github.com/streadway/amqp"` import to `amqp "github.com/rabbitmq/amqp091-go"` in all files
@@ -40,10 +113,12 @@ Migration from https://github.com/streadway/amqp to https://github.com/rabbitmq/
 * Introduced context management to stop the auto-reconnect process on client manual disconnect
 
 # 1.4.0
+
 * Reverted changes in the `RetryMessage` method signature in v1.3.0
 * Reverted changes done for handling connection close in v1.2.0
 
 Solidified connection and channel management, as well as message ack, nack and reject management:
+
 * Added a custom TTL cache for consumed messages to deal with ack, nack and reject of already consumed messages
 * Added new `ConnnectionStatus` type
 * Added new `ListenStatus` method that returns a stream of `ConnectionStatus`
@@ -54,26 +129,32 @@ Solidified connection and channel management, as well as message ack, nack and r
 * Enriched sent messages with a timestamp
 
 # 1.3.0
+
 **BREAKING CHANGES**
 
 * Changed `RetryMessage` method signature to take a `shouldAck` flag
 * Added condition on message ack based on `shouldAck` value
 
 # 1.2.0
+
 **BREAKING CHANGES**
 
 Added connection close listener
+
 * New `NotifyClose` method to listen to connection close
 * Updated `SubscribeToMessages` method signature to take a context as argument and deal with it being done
 
 # 1.1.0
+
 Added support for dynamic queue, exchange et binding management
+
 * MQTT Client new methods:
     * `CreateQueue`: Creates a queue from given configuration
     * `CreateExchange`: Creates exchange from given configuration
     * `BindExchangeToQueueViaRoutingKey`: Binds exchange to queue via given routing key
     * `QueueIsEmpty`: Returns whether a queue is empty or not. Returns an error if the queue doesn't exist
-    * `GetNumberOfMessages`: Returns the number of messages contained in a queue. Returns an error if the queue doesn't exist
+    * `GetNumberOfMessages`: Returns the number of messages contained in a queue. Returns an error if the queue doesn't
+      exist
     * `PopMessageFromQueue`: Pop message from queue (Retrieve first out). Returns an error if the queue is empty
     * `PurgeQueue`: Purges all messages from a queue. Returns an error if the queue doesn't exist
     * `DeleteQueue`: Deletes a queue. Returns an error if the queue doesn't exist
@@ -82,17 +163,20 @@ Added support for dynamic queue, exchange et binding management
     * Use MQTT Client for setup operations
     * Moved helper functions `declareExchange`, `declareQueue` and `addQueueBinding` to MQTT Client as private methods.
 
-
 # 1.0.0
+
 Official stable release of Gorabbit
+
 * Removed logging module
 * Modified `NewClientDebug` constructor to take a `logrus.Logger` logger as a parameter
 * Working and tested retry strategy for failed messages
 
 # 0.1.5
+
 (**NOTE**: This version has **Breaking Changes** and should have been released in v1.0.0)
 
 Added redelivery and max retry feature
+
 * Added `RetryMessage` functionality that acknowledges an event then re-sends it to the same queue
 * Redelivered messages are acknowledged and then re-sent with incremented `x-redelivered-count` header
 * The redelivery strategy is based on the `x-redelivered-count` header of an event
@@ -103,8 +187,8 @@ Added redelivery and max retry feature
 * Introduced `NewClientDebug` factory that will enable logs
 * Introduced logs in all operations
 
-
 # 0.1.4
+
 * Renamed `MessageType` to `AMQPMessage`
 * `AMQPMessage` inherits `amqp.Delivery`
 * Made `Subscribe` method return a channel of `AMQPMessage` instead of amqp.Delivery
@@ -113,8 +197,8 @@ Added redelivery and max retry feature
 * `ClientConfig` added `MaxRetry` and `RetryDelay` properties
 * Implemented a retry strategy on the `Connect` method
 
-
 # 0.1.3
+
 Fixed readme file typo in Installation section
 
 # 0.1.2

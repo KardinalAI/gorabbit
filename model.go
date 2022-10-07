@@ -1,31 +1,22 @@
 package gorabbit
 
 import (
-	"errors"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"sync"
-	"time"
 )
 
-type ClientConfig struct {
-	Host      string
-	Port      uint
-	Username  string
-	Password  string
-	KeepAlive bool
-}
-
 type ExchangeConfig struct {
-	Name      string `yaml:"name"`
-	Type      string `yaml:"type"`
-	Persisted bool   `yaml:"persisted"`
+	Name      string                 `yaml:"name"`
+	Type      ExchangeType           `yaml:"type"`
+	Persisted bool                   `yaml:"persisted"`
+	Args      map[string]interface{} `yaml:"args"`
 }
 
 type QueueConfig struct {
-	Name      string           `yaml:"name"`
-	Durable   bool             `yaml:"durable"`
-	Exclusive bool             `yaml:"exclusive"`
-	Bindings  *[]BindingConfig `yaml:"bindings"`
+	Name      string                 `yaml:"name"`
+	Durable   bool                   `yaml:"durable"`
+	Exclusive bool                   `yaml:"exclusive"`
+	Args      map[string]interface{} `yaml:"args"`
+	Bindings  []BindingConfig        `yaml:"bindings"`
 }
 
 type BindingConfig struct {
@@ -33,163 +24,67 @@ type BindingConfig struct {
 	Exchange   string `yaml:"exchange"`
 }
 
-type RabbitServerConfig struct {
-	Exchanges []ExchangeConfig `yaml:"exchanges"`
-	Queues    []QueueConfig    `yaml:"queues"`
+type publishingOptions struct {
+	messagePriority *MessagePriority
+	deliveryMode    *DeliveryMode
 }
 
-type AMQPMessage struct {
-	amqp.Delivery
-	Type         string
-	Microservice string
-	Entity       string
-	Action       string
+func SendOptions() *publishingOptions {
+	return &publishingOptions{}
 }
 
-func (msg *AMQPMessage) GetRedeliveryCount() int {
-	val, ok := msg.Headers[RedeliveryHeader]
-
-	if !ok {
-		return 0
-	} else {
-		return int(val.(int32))
-	}
-}
-
-func (msg *AMQPMessage) IncrementRedeliveryHeader() int {
-	redeliveredCount := msg.GetRedeliveryCount()
-	redeliveredCount++
-
-	newHeader := map[string]interface{}{
-		RedeliveryHeader: redeliveredCount,
+func (m *publishingOptions) priority() uint8 {
+	if m.messagePriority == nil {
+		return PriorityMedium.Uint8()
 	}
 
-	msg.Headers = newHeader
-
-	return redeliveredCount
+	return m.messagePriority.Uint8()
 }
 
-func (msg *AMQPMessage) Ack(multiple bool) error {
-	if _, ok := consumed.Get(msg.DeliveryTag); !ok {
-		if msg.Acknowledger != nil {
-			err := msg.Acknowledger.Ack(msg.DeliveryTag, multiple)
-			if err != nil {
-				return err
-			}
-			consumed.Put(msg.DeliveryTag)
-			return nil
-		} else {
-			return errors.New("delivery not initialized")
-		}
+func (m *publishingOptions) mode() uint8 {
+	if m.deliveryMode == nil {
+		return Persistent.Uint8()
 	}
 
-	// If the message is already acknowledged then we just skip
-	return nil
+	return m.deliveryMode.Uint8()
 }
 
-func (msg *AMQPMessage) Nack(multiple bool, requeue bool) error {
-	if _, ok := consumed.Get(msg.DeliveryTag); !ok {
-		if msg.Acknowledger != nil {
-			err := msg.Acknowledger.Nack(msg.DeliveryTag, multiple, requeue)
-			if err != nil {
-				return err
-			}
-			consumed.Put(msg.DeliveryTag)
-			return nil
-		} else {
-			return errors.New("delivery not initialized")
-		}
-	}
+func (m *publishingOptions) SetPriority(priority MessagePriority) *publishingOptions {
+	m.messagePriority = &priority
 
-	// If the message is already not acknowledged then we just skip
-	return nil
+	return m
 }
 
-func (msg *AMQPMessage) Reject(requeue bool) error {
-	if _, ok := consumed.Get(msg.DeliveryTag); !ok {
-		if msg.Acknowledger != nil {
-			err := msg.Acknowledger.Reject(msg.DeliveryTag, requeue)
-			if err != nil {
-				return err
-			}
-			consumed.Put(msg.DeliveryTag)
-			return nil
-		} else {
-			return errors.New("delivery not initialized")
-		}
-	}
+func (m *publishingOptions) SetMode(mode DeliveryMode) *publishingOptions {
+	m.deliveryMode = &mode
 
-	// If the message is already rejected then we just skip
-	return nil
+	return m
 }
 
-func (msg *AMQPMessage) ToPublishing() amqp.Publishing {
-	return amqp.Publishing{
-		ContentType: msg.ContentType,
-		Body:        msg.Body,
-		Type:        msg.RoutingKey,
-		Priority:    msg.Priority,
-		MessageId:   msg.MessageId,
-		Headers:     msg.Headers,
-	}
-}
+type consumptionHealth map[string]bool
 
-type ttlMap struct {
-	m map[uint64]time.Time
-	l sync.Mutex
-}
-
-func newTTLMap(ln int, maxTTL time.Duration) (m *ttlMap) {
-	m = &ttlMap{m: make(map[uint64]time.Time, ln)}
-	go func() {
-		for now := range time.Tick(maxTTL / 3) {
-			m.l.Lock()
-			for k, v := range m.m {
-				if now.Sub(v) >= maxTTL {
-					delete(m.m, k)
-				}
-			}
-			m.l.Unlock()
-		}
-	}()
-	return
-}
-
-func (m *ttlMap) Len() int {
-	return len(m.m)
-}
-
-func (m *ttlMap) Put(k uint64) {
-	m.l.Lock()
-	defer m.l.Unlock()
-	_, ok := m.m[k]
-	if !ok {
-		m.m[k] = time.Now()
-	}
-}
-
-func (m *ttlMap) Get(k uint64) (v time.Time, found bool) {
-	m.l.Lock()
-	defer m.l.Unlock()
-	v, found = m.m[k]
-	return
-}
-
-type SubscriptionsHealth map[string]bool
-
-func (s SubscriptionsHealth) IsHealthy() bool {
+func (s consumptionHealth) IsHealthy() bool {
 	for _, v := range s {
 		if !v {
 			return false
 		}
 	}
+
 	return true
 }
 
-func (s SubscriptionsHealth) AddSubscription(queue string, err error) {
-	if err != nil {
-		s[queue] = false
-	} else {
-		s[queue] = true
-	}
+func (s consumptionHealth) AddSubscription(queue string, err error) {
+	s[queue] = err == nil
+}
+
+type mqttPublishing struct {
+	Exchange   string
+	RoutingKey string
+	Mandatory  bool
+	Immediate  bool
+	Msg        amqp.Publishing
+}
+
+func (m mqttPublishing) HashCode() string {
+	return m.Msg.MessageId
 }

@@ -1,10 +1,14 @@
-module gitlab.kardinal.ai/coretech/gorabbit/v2
+module gitlab.kardinal.ai/coretech/gorabbit/v3
 
-go 1.16
+go 1.18
 
 require (
-	github.com/go-playground/assert/v2 v2.0.1
 	github.com/google/uuid v1.3.0
-	github.com/rabbitmq/amqp091-go v0.0.0-20210921101955-bb8191b6c914
-	gitlab.kardinal.ai/coretech/go-logging v0.0.0-20210730074554-d7731c3e8041
+	github.com/rabbitmq/amqp091-go v1.4.0
+	github.com/sirupsen/logrus v1.9.0
+)
+
+require (
+	github.com/stretchr/testify v1.8.0 // indirect
+	golang.org/x/sys v0.0.0-20220818161305-2296e01440c6 // indirect
 )

@@ -2,366 +2,284 @@ package gorabbit
 
 import (
 	"context"
-	"errors"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"time"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-type connectionManager struct {
-	uri              string
-	ctx              context.Context
-	connection       *amqp.Connection
-	channel          *amqp.Channel
-	connectionStatus chan ConnectionStatus
-	keepAlive        bool
-	subscriptions    SubscriptionsHealth
-	logger           Logger
+// amqpConnection holds information about the management of the native amqp.Connection.
+type amqpConnection struct {
+	// ctx is the parent context and acts as a safeguard.
+	ctx context.Context
+
+	// connection is the native amqp.Connection.
+	connection *amqp.Connection
+
+	// uri represents the connection string to the RabbitMQ server.
+	uri string
+
+	// keepAlive is the flag that will define whether active guards and re-connections are enabled or not.
+	keepAlive bool
+
+	// retryDelay defines the delay to wait before re-connecting if we lose connection and the keepAlive flag is set to true.
+	retryDelay time.Duration
+
+	// closed is an inner property that switches to true if the connection was explicitly closed.
+	closed bool
+
+	// channels holds a list of active amqpChannel
+	channels amqpChannels
+
+	// maxRetry defines the number of retries when publishing a message.
+	maxRetry uint
+
+	// publishingCacheSize defines the maximum length of cached failed publishing.
+	publishingCacheSize uint64
+
+	// publishingCacheTTL defines the time to live for a cached failed publishing.
+	publishingCacheTTL time.Duration
+
+	// logger logs events.
+	logger logger
+
+	// connectionType defines the connectionType.
+	connectionType connectionType
 }
 
-func newManager(ctx context.Context, uri string, keepAlive bool, logger Logger) *connectionManager {
-	c := &connectionManager{
-		uri:              uri,
-		ctx:              ctx,
-		connectionStatus: make(chan ConnectionStatus, 5),
-		keepAlive:        keepAlive,
-		subscriptions:    make(SubscriptionsHealth),
-		logger:           logger,
+// newConsumerConnection initializes a new consumer amqpConnection with given arguments.
+//	- ctx is the parent context.
+//	- uri is the connection string.
+//	- keepAlive will keep the connection alive if true.
+//	- retryDelay defines the delay between each re-connection, if the keepAlive flag is set to true.
+//	- logger is the parent logger.
+func newConsumerConnection(ctx context.Context, uri string, keepAlive bool, retryDelay time.Duration, logger logger) *amqpConnection {
+	return newConnection(ctx, uri, keepAlive, retryDelay, logger, connectionTypeConsumer)
+}
+
+// newPublishingConnection initializes a new publisher amqpConnection with given arguments.
+//	- ctx is the parent context.
+//	- uri is the connection string.
+//	- keepAlive will keep the connection alive if true.
+//	- retryDelay defines the delay between each re-connection, if the keepAlive flag is set to true.
+//	- maxRetry defines the publishing max retry header.
+//	- publishingCacheSize defines the maximum length of failed publishing cache.
+//	- publishingCacheTTL defines the time to live for failed publishing in cache.
+//	- logger is the parent logger.
+func newPublishingConnection(ctx context.Context, uri string, keepAlive bool, retryDelay time.Duration, maxRetry uint, publishingCacheSize uint64, publishingCacheTTL time.Duration, logger logger) *amqpConnection {
+	conn := newConnection(ctx, uri, keepAlive, retryDelay, logger, connectionTypePublisher)
+
+	conn.maxRetry = maxRetry
+	conn.publishingCacheSize = publishingCacheSize
+	conn.publishingCacheTTL = publishingCacheTTL
+
+	return conn
+}
+
+// newConnection initializes a new amqpConnection with given arguments.
+//	- ctx is the parent context.
+//	- uri is the connection string.
+//	- keepAlive will keep the connection alive if true.
+//	- retryDelay defines the delay between each re-connection, if the keepAlive flag is set to true.
+//	- logger is the parent logger.
+func newConnection(ctx context.Context, uri string, keepAlive bool, retryDelay time.Duration, logger logger, connectionType connectionType) *amqpConnection {
+	conn := &amqpConnection{
+		ctx:        ctx,
+		uri:        uri,
+		keepAlive:  keepAlive,
+		retryDelay: retryDelay,
+		channels:   make(amqpChannels, 0),
+		logger: inheritLogger(logger, map[string]interface{}{
+			"context": "connection",
+			"type":    connectionType,
+		}),
+		connectionType: connectionType,
 	}
 
-	if c.keepAlive {
-		go func() {
-			for {
-				err := c.newConnection()
-				if err != nil {
-					c.logger.Printf("could not create new connection: %s", err.Error())
-					c.connectionStatus <- ConnFailed
-					time.Sleep(reconnectDelay)
-				} else {
-					break
+	conn.logger.Debug("Initializing new amqp connection", logField{Key: "uri", Value: uri})
+
+	// We open an initial connection.
+	err := conn.open()
+
+	// If the connection failed and the keepAlive flag is set to true, we want to re-connect until success.
+	if err != nil && keepAlive {
+		go conn.reconnect()
+	}
+
+	return conn
+}
+
+// open opens a new amqp.Connection with the help of a defined uri.
+func (a *amqpConnection) open() error {
+	// If the uri is empty, we return an error.
+	if a.uri == "" {
+		return errEmptyURI
+	}
+
+	a.logger.Debug("Connecting to RabbitMQ server", logField{Key: "uri", Value: a.uri})
+
+	// We request a connection from the RabbitMQ server.
+	conn, err := amqp.Dial(a.uri)
+	if err != nil {
+		a.logger.Error(err, "Connection failed")
+
+		return err
+	}
+
+	a.logger.Info("Connection successful", logField{Key: "uri", Value: a.uri})
+
+	a.connection = conn
+
+	a.channels.updateParentConnection(a.connection)
+
+	// If the keepAlive flag is set to true, we activate a new guard.
+	if a.keepAlive {
+		go a.guard()
+	}
+
+	return nil
+}
+
+// reconnect will indefinitely call the open method until a connection is successfully established or the context is canceled.
+func (a *amqpConnection) reconnect() {
+	a.logger.Debug("Re-connection launched")
+
+	for {
+		select {
+		case <-a.ctx.Done():
+			a.logger.Debug("Re-connection stopped by the context")
+
+			// If the context was canceled, we break out of the method.
+			return
+		default:
+			// Wait for the retryDelay.
+			time.Sleep(a.retryDelay)
+
+			// If there is no connection or the current connection is closed, we open a new connection.
+			if !a.ready() {
+				err := a.open()
+				// If the operation succeeds, we break the loop.
+				if err == nil {
+					a.logger.Debug("Re-connection successful")
+
+					return
 				}
+
+				a.logger.Error(err, "Could not open new connection during re-connection")
+			} else {
+				// If the connection exists and is active, we break out.
+				return
 			}
-		}()
-	} else {
-		err := c.newConnection()
-		if err != nil {
-			c.logger.Printf("could not create new connection: %s", err.Error())
-			c.connectionStatus <- ConnFailed
 		}
 	}
-
-	return c
 }
 
-var connectionError = errors.New("connection or channel closed")
+// guard is a connection safeguard that listens to connection close events and re-launches the connection.
+func (a *amqpConnection) guard() {
+	a.logger.Debug("Guard launched")
 
-func (c *connectionManager) newConnection() error {
-	if c.uri == "" {
-		return errors.New("amqp uri is empty")
+	for {
+		select {
+		case <-a.ctx.Done():
+			a.logger.Debug("Guard stopped by the context")
+
+			// If the context was canceled, we break out of the method.
+			return
+		case err, ok := <-a.connection.NotifyClose(make(chan *amqp.Error)):
+			if !ok {
+				return
+			}
+
+			if err != nil {
+				a.logger.Warn("Connection lost", logField{Key: "reason", Value: err.Reason}, logField{Key: "code", Value: err.Code})
+			}
+
+			// If the connection was explicitly closed, we do not want to re-connect.
+			if a.closed {
+				return
+			}
+
+			go a.reconnect()
+
+			return
+		}
 	}
+}
 
-	if c.connection == nil || c.connection.IsClosed() {
-		conn, err := amqp.Dial(c.uri)
+// close the connection only if it is ready.
+func (a *amqpConnection) close() error {
+	if a.ready() {
+		for _, channel := range a.channels {
+			err := channel.close()
+			if err != nil {
+				return err
+			}
+		}
 
+		err := a.connection.Close()
 		if err != nil {
+			a.logger.Error(err, "Could not close connection")
+
 			return err
 		}
-
-		c.connectionStatus <- ConnUp
-
-		c.connection = conn
-
-		if c.keepAlive {
-			go c.keepConnectionAlive()
-		}
 	}
 
-	return c.newChannel()
-}
+	a.closed = true
 
-func (c *connectionManager) newChannel() error {
-	ch, err := c.connection.Channel()
-
-	if err != nil {
-		return err
-	}
-
-	c.connectionStatus <- ChanUp
-
-	c.channel = ch
-
-	err = c.channel.Qos(10, 0, false)
-
-	if err != nil {
-		c.logger.Printf("could not declare QOS with prefetch count of %d", 10)
-		return err
-	}
-
-	if c.keepAlive {
-		go c.keepChannelAlive()
-	}
+	a.logger.Info("Connection closed")
 
 	return nil
 }
 
-func (c *connectionManager) close() error {
-	if c.channel != nil && !c.channel.IsClosed() {
-		err := c.channel.Close()
-
-		if err != nil {
-			return err
-		}
-
-		if !c.keepAlive {
-			c.connectionStatus <- ChanDown
-		}
-
-		c.channel = nil
-	}
-
-	if c.connection != nil && !c.connection.IsClosed() {
-		err := c.connection.Close()
-
-		if err != nil {
-			return err
-		}
-
-		if !c.keepAlive {
-			c.connectionStatus <- ConnDown
-		}
-	}
-
-	c.connection = nil
-
-	return nil
+// ready returns true if the connection exists and is not closed.
+func (a *amqpConnection) ready() bool {
+	return a.connection != nil && !a.connection.IsClosed()
 }
 
-func (c *connectionManager) isOperational() bool {
-	if c.connection == nil {
+// healthy returns true if the connection exists, is not closed and all child channels are healthy.
+func (a *amqpConnection) healthy() bool {
+	// If the connection is not ready, return false.
+	if !a.ready() {
 		return false
 	}
 
-	if c.connection.IsClosed() {
-		return false
-	}
-
-	if c.channel == nil {
-		return false
-	}
-
-	if c.channel.IsClosed() {
-		return false
+	// Verify that all connection channels are ready too.
+	for _, channel := range a.channels {
+		if !channel.healthy() {
+			return false
+		}
 	}
 
 	return true
 }
 
-func (c *connectionManager) isHealthy() bool {
-	return c.subscriptions.IsHealthy()
-}
+// registerConsumer opens a new consumerChannel and registers the MessageConsumer.
+func (a *amqpConnection) registerConsumer(consumer MessageConsumer) error {
+	for _, channel := range a.channels {
+		if channel.consumer != nil && channel.consumer.Queue == consumer.Queue {
+			err := errConsumerAlreadyExists
 
-func (c *connectionManager) keepConnectionAlive() {
-	for {
-		select {
-		case <-c.ctx.Done():
-			return
-		case _, ok := <-c.connection.NotifyClose(make(chan *amqp.Error)):
-			c.connectionStatus <- ConnDown
-			if !ok {
-				return
-			}
+			a.logger.Error(err, "Could not register consumer", logField{Key: "consumer", Value: consumer.Name})
 
-		Loop:
-			for {
-				// wait reconnectDelay before trying to reconnect
-				time.Sleep(reconnectDelay)
-
-				select {
-				case <-c.ctx.Done():
-					return
-				default:
-					var err error
-					c.connection, err = amqp.Dial(c.uri)
-					if err == nil {
-						c.connectionStatus <- ConnUp
-						break Loop
-					}
-				}
-			}
+			return err
 		}
 	}
+
+	channel := newConsumerChannel(a.ctx, a.connection, a.keepAlive, a.retryDelay, &consumer, a.logger)
+
+	a.channels = append(a.channels, channel)
+
+	a.logger.Info("Consumer registered", logField{Key: "consumer", Value: consumer.Name})
+
+	return nil
 }
 
-func (c *connectionManager) keepChannelAlive() {
-	for {
-		select {
-		case <-c.ctx.Done():
-			return
-		case _, ok := <-c.channel.NotifyClose(make(chan *amqp.Error)):
-			c.connectionStatus <- ChanDown
+func (a *amqpConnection) publish(exchange, routingKey string, payload []byte, options *publishingOptions) error {
+	publishingChannel := a.channels.publishingChannel()
+	if publishingChannel == nil {
+		publishingChannel = newPublishingChannel(a.ctx, a.connection, a.keepAlive, a.retryDelay, a.maxRetry, a.publishingCacheSize, a.publishingCacheTTL, a.logger)
 
-			if !ok {
-				return
-			}
-
-		Loop:
-			for {
-				// wait reconnectDelay before trying to reconnect
-				time.Sleep(reconnectDelay)
-
-				select {
-				case <-c.ctx.Done():
-					return
-				default:
-					if c.connection == nil || c.connection.IsClosed() {
-						continue
-					}
-
-					var err error
-					c.channel, err = c.connection.Channel()
-					if err == nil {
-						c.connectionStatus <- ChanUp
-						break Loop
-					}
-				}
-			}
-		}
-	}
-}
-
-func (c *connectionManager) Publish(exchange, routingKey string, mandatory, immediate bool, msg amqp.Publishing) error {
-	if !c.isOperational() {
-		return connectionError
+		a.channels = append(a.channels, publishingChannel)
 	}
 
-	return c.channel.Publish(
-		exchange,
-		routingKey,
-		mandatory,
-		immediate,
-		msg,
-	)
-}
-
-func (c *connectionManager) Consume(queue, consumer string, autoAck, exclusive, noLocal, noWait bool, args amqp.Table) (<-chan amqp.Delivery, error) {
-	if !c.isOperational() {
-		return nil, connectionError
-	}
-
-	messages, err := c.channel.Consume(
-		queue,
-		consumer,
-		autoAck,
-		exclusive,
-		noLocal,
-		noWait,
-		args,
-	)
-
-	c.subscriptions.AddSubscription(queue, err)
-
-	return messages, err
-}
-
-func (c *connectionManager) ExchangeDeclare(name, kind string, durable, autoDelete, internal, noWait bool, args amqp.Table) error {
-	if !c.isOperational() {
-		return connectionError
-	}
-
-	return c.channel.ExchangeDeclare(
-		name,
-		kind,
-		durable,
-		autoDelete,
-		internal,
-		noWait,
-		args,
-	)
-}
-
-func (c *connectionManager) ExchangeDelete(name string, ifUnused, noWait bool) error {
-	if !c.isOperational() {
-		return connectionError
-	}
-
-	return c.channel.ExchangeDelete(
-		name,
-		ifUnused,
-		noWait,
-	)
-}
-
-func (c *connectionManager) QueueDeclare(name string, durable, autoDelete, exclusive, noWait bool, args amqp.Table) (amqp.Queue, error) {
-	if !c.isOperational() {
-		return amqp.Queue{}, connectionError
-	}
-
-	return c.channel.QueueDeclare(
-		name,
-		durable,
-		autoDelete,
-		exclusive,
-		noWait,
-		args,
-	)
-}
-
-func (c *connectionManager) QueueDeclarePassive(name string, durable, autoDelete, exclusive, noWait bool, args amqp.Table) (amqp.Queue, error) {
-	if !c.isOperational() {
-		return amqp.Queue{}, connectionError
-	}
-
-	return c.channel.QueueDeclarePassive(
-		name,
-		durable,
-		autoDelete,
-		exclusive,
-		noWait,
-		args,
-	)
-}
-
-func (c *connectionManager) QueueBind(name, key, exchange string, noWait bool, args amqp.Table) error {
-	if !c.isOperational() {
-		return connectionError
-	}
-
-	return c.channel.QueueBind(
-		name,
-		key,
-		exchange,
-		noWait,
-		args,
-	)
-}
-
-func (c *connectionManager) QueuePurge(name string, noWait bool) (int, error) {
-	if !c.isOperational() {
-		return 0, connectionError
-	}
-
-	return c.channel.QueuePurge(
-		name,
-		noWait,
-	)
-}
-
-func (c *connectionManager) QueueDelete(name string, ifUnused, ifEmpty, noWait bool) (int, error) {
-	if !c.isOperational() {
-		return 0, connectionError
-	}
-
-	return c.channel.QueueDelete(
-		name,
-		ifUnused,
-		ifEmpty,
-		noWait,
-	)
-}
-
-func (c *connectionManager) Get(queue string, autoAck bool) (amqp.Delivery, bool, error) {
-	if !c.isOperational() {
-		return amqp.Delivery{}, false, connectionError
-	}
-
-	return c.channel.Get(queue, autoAck)
+	return publishingChannel.publish(exchange, routingKey, payload, options)
 }

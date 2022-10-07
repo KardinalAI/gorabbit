@@ -1,26 +1,128 @@
 package gorabbit
 
 import (
-	"fmt"
-	"gitlab.kardinal.ai/coretech/go-logging"
+	"os"
+
+	"github.com/sirupsen/logrus"
 )
 
-// Logger is the interface to send logs to. It can be set using
-// WithPublisherOptionsLogger() or WithConsumerOptionsLogger().
-type Logger interface {
-	Printf(string, ...interface{})
+type logField struct {
+	Key   string
+	Value interface{}
 }
 
-const loggingPrefix = "gorabbit"
+// logger is the interface that defines log methods.
+type logger interface {
+	Error(error, string, ...logField)
 
-// stdLogger logs to stdout using go's default logger.
-type stdLogger struct{}
+	Warn(string, ...logField)
 
-func (l stdLogger) Printf(format string, v ...interface{}) {
-	logging.Logger.Infof(fmt.Sprintf("%s: %s", loggingPrefix, format), v...)
+	Info(string, ...logField)
+
+	Debug(string, ...logField)
+}
+
+// stdLogger logs to stdout using logrus (https://github.com/sirupsen/logrus).
+type stdLogger struct {
+	logger     *logrus.Logger
+	identifier string
+	logFields  map[string]interface{}
+}
+
+func newStdLogger() logger {
+	return &stdLogger{
+		logger:     newLogrus(),
+		identifier: libraryName,
+		logFields:  nil,
+	}
+}
+
+func (l stdLogger) getExtraFields(fields []logField) map[string]interface{} {
+	extraFields := make(map[string]interface{})
+
+	for k, field := range l.logFields {
+		extraFields[k] = field
+	}
+
+	for _, extraField := range fields {
+		extraFields[extraField.Key] = extraField.Value
+	}
+
+	return extraFields
+}
+
+func (l stdLogger) Error(err error, s string, fields ...logField) {
+	log := l.logger.WithField("library", l.identifier)
+
+	extraFields := l.getExtraFields(fields)
+
+	log.WithFields(extraFields).WithError(err).Error(s)
+}
+
+func (l stdLogger) Warn(s string, fields ...logField) {
+	log := l.logger.WithField("library", l.identifier)
+
+	extraFields := l.getExtraFields(fields)
+
+	log.WithFields(extraFields).Warn(s)
+}
+
+func (l stdLogger) Info(s string, fields ...logField) {
+	log := l.logger.WithField("library", l.identifier)
+
+	extraFields := l.getExtraFields(fields)
+
+	log.WithFields(extraFields).Info(s)
+}
+
+func (l stdLogger) Debug(s string, fields ...logField) {
+	log := l.logger.WithField("library", l.identifier)
+
+	extraFields := l.getExtraFields(fields)
+
+	log.WithFields(extraFields).Debug(s)
 }
 
 // noLogger does not log at all, this is the default.
 type noLogger struct{}
 
-func (l noLogger) Printf(format string, v ...interface{}) {}
+func (l noLogger) Error(err error, s string, fields ...logField) {}
+
+func (l noLogger) Warn(s string, fields ...logField) {}
+
+func (l noLogger) Info(s string, fields ...logField) {}
+
+func (l noLogger) Debug(s string, fields ...logField) {}
+
+func newLogrus() *logrus.Logger {
+	log := &logrus.Logger{
+		Out: os.Stdout,
+		Formatter: &logrus.JSONFormatter{
+			DisableTimestamp: true,
+		},
+		Level: logrus.DebugLevel,
+	}
+
+	logLevel := os.Getenv("LOG_LEVEL")
+	if logLevel != "" {
+		lvl, err := logrus.ParseLevel(logLevel)
+		if err == nil {
+			log.Level = lvl
+		}
+	}
+
+	return log
+}
+
+func inheritLogger(parent logger, logFields map[string]interface{}) logger {
+	switch v := parent.(type) {
+	case *stdLogger:
+		return &stdLogger{
+			logger:     v.logger,
+			identifier: libraryName,
+			logFields:  logFields,
+		}
+	default:
+		return parent
+	}
+}
