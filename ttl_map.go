@@ -10,13 +10,13 @@ type ttlMapValue[V any] struct {
 	createdAt time.Time
 }
 
-type ttlMap[K, V any] struct {
-	m map[any]ttlMapValue[V]
+type ttlMap[K comparable, V any] struct {
+	m map[K]ttlMapValue[V]
 	l sync.Mutex
 }
 
-func newTTLMap[K, V any](ln uint64, maxTTL time.Duration) *ttlMap[K, V] {
-	m := &ttlMap[K, V]{m: make(map[any]ttlMapValue[V], ln)}
+func newTTLMap[K comparable, V any](ln uint64, maxTTL time.Duration) *ttlMap[K, V] {
+	m := &ttlMap[K, V]{m: make(map[K]ttlMapValue[V], ln)}
 
 	go func() {
 		const tickFraction = 3
@@ -66,11 +66,15 @@ func (m *ttlMap[K, V]) ForEach(process func(k K, v V)) {
 	for key, value := range m.m {
 		innerVal := value.value
 
-		process(key.(K), innerVal)
+		process(key, innerVal)
 	}
 }
 
 func (m *ttlMap[K, V]) Delete(k K) {
+	m.l.Lock()
+
+	defer m.l.Unlock()
+
 	if _, ok := m.m[k]; ok {
 		delete(m.m, k)
 	}
