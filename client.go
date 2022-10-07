@@ -7,26 +7,26 @@ import (
 )
 
 // MQTTClient is a simple MQTT interface that offers basic client operations such as:
-// 	 - Publishing
-//   - Consuming
-//   - Disconnecting
-//   - Ready and health checks
+//	- Publishing
+//	- Consuming
+//	- Disconnecting
+//	- Ready and health checks
 type MQTTClient interface {
 	// Disconnect launches the disconnection process.
 	// This operation disables to client permanently.
 	Disconnect() error
 
 	// Publish will send the desired payload through the selected channel.
-	//  - exchange is the name of the exchange targeted for event publishing.
-	//  - routingKey is the route that the exchange will use to forward the message.
-	//  - payload is the object you want to send as a byte array.
+	//	- exchange is the name of the exchange targeted for event publishing.
+	//	- routingKey is the route that the exchange will use to forward the message.
+	//	- payload is the object you want to send as a byte array.
 	// Returns an error if the connection to the RabbitMQ server is down.
 	Publish(exchange, routingKey string, payload interface{}) error
 
 	// PublishWithOptions will send the desired payload through the selected channel.
-	//  - exchange is the name of the exchange targeted for event publishing.
-	//  - routingKey is the route that the exchange will use to forward the message.
-	//  - payload is the object you want to send as a byte array.
+	//	- exchange is the name of the exchange targeted for event publishing.
+	//	- routingKey is the route that the exchange will use to forward the message.
+	//	- payload is the object you want to send as a byte array.
 	// Optionally you can add publishingOptions for extra customization.
 	// Returns an error if the connection to the RabbitMQ server is down.
 	PublishWithOptions(exchange, routingKey string, payload interface{}, options *publishingOptions) error

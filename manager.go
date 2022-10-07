@@ -12,10 +12,10 @@ import (
 )
 
 // MQTTManager is a simple MQTT interface that offers basic management operations such as:
-// 	 - Creation of queue, exchange and bindings
-//   - Deletion of queues and exchanges
-//   - Purge of queues
-//   - Queue evaluation (existence and number of messages)
+//	- Creation of queue, exchange and bindings
+//	- Deletion of queues and exchanges
+//	- Purge of queues
+//	- Queue evaluation (existence and number of messages)
 type MQTTManager interface {
 	// Disconnect launches the disconnection process.
 	// This operation disables to manager permanently.
