@@ -97,8 +97,10 @@ func (mh MQTTMessageHandlers) matchesPrefixWildcard(storedWords, words []string)
 
 // matchesSuffixWildcard verifies that everything that comes before the '#' wildcard matches.
 func (mh MQTTMessageHandlers) matchesSuffixWildcard(storedWords, words []string) bool {
+	backCount := 2
+
 	// compareIndex starts before the wildcard in the storedWords array.
-	compareIndex := len(storedWords) - 2
+	compareIndex := len(storedWords) - backCount
 
 	// we initialize the wordIdx at -1.
 	wordIdx := -1
@@ -168,25 +170,22 @@ func (mh MQTTMessageHandlers) FindFunc(routingKey string) MQTTMessageHandlerFunc
 		// Split the registered key into individual words.
 		storedWords := strings.Split(key, ".")
 
+		// nolint: gocritic,nestif // We need this if-else block
 		if storedWords[0] == "#" {
 			if !mh.matchesPrefixWildcard(storedWords, words) {
 				continue
 			}
-
-			return fn
 		} else if storedWords[len(storedWords)-1] == "#" {
 			if !mh.matchesSuffixWildcard(storedWords, words) {
 				continue
 			}
-
-			return fn
 		} else {
 			if !mh.matchesKey(storedWords, words) {
 				continue
 			}
-
-			return fn
 		}
+
+		return fn
 	}
 
 	// No matching keys were found.
