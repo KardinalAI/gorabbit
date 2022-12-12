@@ -1,9 +1,49 @@
 package gorabbit
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // MQTTMessageHandlers is a wrapper that holds a map[string]MQTTMessageHandlerFunc.
 type MQTTMessageHandlers map[string]MQTTMessageHandlerFunc
+
+func (mh MQTTMessageHandlers) FindFunc(routingKey string) MQTTMessageHandlerFunc {
+	// We first check for a direct match
+	if fn, found := mh[routingKey]; found {
+		return fn
+	}
+
+	// Split the routing key into individual words.
+	words := strings.Split(routingKey, ".")
+
+	// Check if any of the registered keys match the routing key.
+	for key, fn := range mh {
+		// Split the registered key into individual words.
+		storedWords := strings.Split(key, ".")
+
+		match := true
+
+		if len(words) < len(storedWords) && !strings.HasSuffix(key, "#") {
+			match = false
+			break
+		}
+
+		for i, word := range words {
+			if word != "*" && word != "#" && storedWords[i] != word {
+				match = false
+				break
+			}
+		}
+
+		if match {
+			return fn
+		}
+	}
+
+	// No matching keys were found.
+	return nil
+}
 
 // MQTTMessageHandlerFunc is the function that will be called when a delivery is received.
 type MQTTMessageHandlerFunc func(payload []byte) error
