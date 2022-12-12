@@ -1,11 +1,85 @@
 package gorabbit_test
 
 import (
-	"github.com/stretchr/testify/assert"
-	"gitlab.kardinal.ai/coretech/gorabbit/v3"
-	"log"
+	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"gitlab.kardinal.ai/coretech/gorabbit/v3"
 )
+
+func TestMQTTMessageHandlers_Validate(t *testing.T) {
+	tests := []struct {
+		handlers      gorabbit.MQTTMessageHandlers
+		expectedError error
+	}{
+		{
+			handlers: gorabbit.MQTTMessageHandlers{
+				"event.paola.#":            func(payload []byte) error { return nil },
+				"event.phoebe.*.generated": func(payload []byte) error { return nil },
+				"event.*.space.boom":       func(payload []byte) error { return nil },
+				"*.toto.order.passed":      func(payload []byte) error { return nil },
+				"#.toto":                   func(payload []byte) error { return nil },
+			},
+			expectedError: nil,
+		},
+		{
+			handlers: gorabbit.MQTTMessageHandlers{
+				"": func(payload []byte) error { return nil },
+			},
+			expectedError: errors.New("a routing key cannot be empty"),
+		},
+		{
+			handlers: gorabbit.MQTTMessageHandlers{
+				" ": func(payload []byte) error { return nil },
+			},
+			expectedError: errors.New("a routing key cannot contain spaces"),
+		},
+		{
+			handlers: gorabbit.MQTTMessageHandlers{
+				"#": func(payload []byte) error { return nil },
+			},
+			expectedError: errors.New("a routing key cannot be the wildcard '#'"),
+		},
+		{
+			handlers: gorabbit.MQTTMessageHandlers{
+				"toto.#.titi": func(payload []byte) error { return nil },
+			},
+			expectedError: errors.New("the wildcard '#' in the routing key 'toto.#.titi' is not allowed"),
+		},
+		{
+			handlers: gorabbit.MQTTMessageHandlers{
+				"toto titi": func(payload []byte) error { return nil },
+			},
+			expectedError: errors.New("a routing key cannot contain spaces"),
+		},
+		{
+			handlers: gorabbit.MQTTMessageHandlers{
+				"toto..titi": func(payload []byte) error { return nil },
+			},
+			expectedError: errors.New("the routing key 'toto..titi' is not properly formatted"),
+		},
+		{
+			handlers: gorabbit.MQTTMessageHandlers{
+				".toto.titi": func(payload []byte) error { return nil },
+			},
+			expectedError: errors.New("the routing key '.toto.titi' is not properly formatted"),
+		},
+		{
+			handlers: gorabbit.MQTTMessageHandlers{
+				"toto.titi.": func(payload []byte) error { return nil },
+			},
+			expectedError: errors.New("the routing key 'toto.titi.' is not properly formatted"),
+		},
+	}
+
+	for _, test := range tests {
+		err := test.handlers.Validate()
+
+		assert.Equal(t, test.expectedError, err)
+	}
+}
 
 func TestMQTTMessageHandlers_FindFunc(t *testing.T) {
 	handlers := gorabbit.MQTTMessageHandlers{
@@ -25,7 +99,19 @@ func TestMQTTMessageHandlers_FindFunc(t *testing.T) {
 			shouldMatch: true,
 		},
 		{
+			input:       "event.paola.plan.generated.before.awakening.the.titan",
+			shouldMatch: true,
+		},
+		{
 			input:       "event.phoebe.order.generated",
+			shouldMatch: true,
+		},
+		{
+			input:       "event.phoebe.toto.generated",
+			shouldMatch: true,
+		},
+		{
+			input:       "event.phoebe.titi.generated",
 			shouldMatch: true,
 		},
 		{
@@ -62,10 +148,8 @@ func TestMQTTMessageHandlers_FindFunc(t *testing.T) {
 		},
 	}
 
-	for i, test := range tests {
-		log.Println("INDEX", i)
+	for _, test := range tests {
 		fn := handlers.FindFunc(test.input)
-		log.Println("FOUND FUNCTION", fn)
 
 		if test.shouldMatch {
 			assert.NotNil(t, fn)

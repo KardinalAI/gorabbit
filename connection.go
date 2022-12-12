@@ -265,6 +265,10 @@ func (a *amqpConnection) registerConsumer(consumer MessageConsumer) error {
 		}
 	}
 
+	if err := consumer.Handlers.Validate(); err != nil {
+		return err
+	}
+
 	channel := newConsumerChannel(a.ctx, a.connection, a.keepAlive, a.retryDelay, &consumer, a.logger)
 
 	a.channels = append(a.channels, channel)

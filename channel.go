@@ -383,10 +383,10 @@ func (c *amqpChannel) consume() {
 
 // processDelivery is the logic that defines what to do with a processed delivery and its error.
 func (c *amqpChannel) processDelivery(delivery *amqp.Delivery) {
-	handler, found := c.consumer.Handlers[delivery.RoutingKey]
+	handler := c.consumer.Handlers.FindFunc(delivery.RoutingKey)
 
 	// If the handler doesn't exist for the received delivery, we negative acknowledge it without requeue.
-	if !found {
+	if handler == nil {
 		c.logger.Debug("No handler found", logField{Key: "routingKey", Value: delivery.RoutingKey})
 
 		// If the consumer is not set to auto acknowledge the delivery, we negative acknowledge it without requeue.
