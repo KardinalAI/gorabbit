@@ -12,10 +12,10 @@ import (
 )
 
 // MQTTManager is a simple MQTT interface that offers basic management operations such as:
-//	- Creation of queue, exchange and bindings
-//	- Deletion of queues and exchanges
-//	- Purge of queues
-//	- Queue evaluation (existence and number of messages)
+//   - Creation of queue, exchange and bindings
+//   - Deletion of queues and exchanges
+//   - Purge of queues
+//   - Queue evaluation (existence and number of messages)
 type MQTTManager interface {
 	// Disconnect launches the disconnection process.
 	// This operation disables to manager permanently.
@@ -69,6 +69,9 @@ type mqttManager struct {
 	// Password is the RabbitMQ server allowed password.
 	Password string
 
+	// Vhost is used for CloudAMQP connections to set the specific vhost.
+	Vhost string
+
 	// logger defines the logger used, depending on the mode set.
 	logger logger
 
@@ -91,10 +94,11 @@ func NewManager(options *ManagerOptions) (MQTTManager, error) {
 	}
 
 	manager := &mqttManager{
-		Host:     options.host,
-		Port:     options.port,
-		Username: options.username,
-		Password: options.password,
+		Host:     options.Host,
+		Port:     options.Port,
+		Username: options.Username,
+		Password: options.Password,
+		Vhost:    options.Vhost,
 		logger:   &noLogger{},
 	}
 
@@ -110,15 +114,21 @@ func NewManager(options *ManagerOptions) (MQTTManager, error) {
 	// We check if the mode was overwritten with the environment variable "GORABBIT_MODE".
 	if modeOverride := os.Getenv("GORABBIT_MODE"); isValidMode(modeOverride) {
 		// We override the mode only if it is valid
-		options.mode = modeOverride
+		options.Mode = modeOverride
 	}
 
-	if options.mode == Debug {
+	if options.Mode == Debug {
 		// If the mode is Debug, we want to actually log important events.
 		manager.logger = newStdLogger()
 	}
 
-	dialURL := fmt.Sprintf("amqp://%s:%s@%s:%d/", manager.Username, manager.Password, manager.Host, manager.Port)
+	protocol := defaultProtocol
+
+	if options.UseTLS {
+		protocol = securedProtocol
+	}
+
+	dialURL := fmt.Sprintf("%s://%s:%s@%s:%d/%s", protocol, manager.Username, manager.Password, manager.Host, manager.Port, manager.Vhost)
 
 	var err error
 

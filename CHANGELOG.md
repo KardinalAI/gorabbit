@@ -1,3 +1,10 @@
+# 3.1.0
+
+Added TLS and CloudAMQP support.
+
+* `ClientOptions` now accepts two new fields: `Vhost` and `UseTLS`,
+* `ManagerOptions` now accepts two new fields: `Vhost` and `UseTLS`.
+
 # 3.0.0
 
 Official V3 release of Gorabbit with **Breaking Changes**

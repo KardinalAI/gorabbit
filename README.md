@@ -106,6 +106,8 @@ parameter.
 | Port                | The port of the RabbitMQ server                         | 5672          |
 | Username            | The plain authentication username                       | guest         |
 | Password            | The plain authentication password                       | guest         |
+| Vhost               | The specific vhost to use when connection to CloudAMQP  |               |
+| UseTLS              | The flag that activates the use of TLS (amqps)          | false         |
 | KeepAlive           | The flag that activates retry and re-connect mechanisms | true          |
 | RetryDelay          | The delay between each retry and re-connection          | 3 seconds     |
 | MaxRetry            | The max number of message retry if it failed to process | 5             |
@@ -296,6 +298,8 @@ parameter.
 | Port                | The port of the RabbitMQ server                         | 5672          |
 | Username            | The plain authentication username                       | guest         |
 | Password            | The plain authentication password                       | guest         |
+| Vhost               | The specific vhost to use when connection to CloudAMQP  |               |
+| UseTLS              | The flag that activates the use of TLS (amqps)          | false         |
 | Mode                | The mode defines whether logs are shown or not          | Release       |
 
 ### Manager with default options

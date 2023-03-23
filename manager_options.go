@@ -2,30 +2,38 @@ package gorabbit
 
 // ManagerOptions holds all necessary properties to launch a successful connection with an MQTTManager.
 type ManagerOptions struct {
-	// host is the RabbitMQ server host name.
-	host string
+	// Host is the RabbitMQ server host name.
+	Host string
 
-	// port is the RabbitMQ server port number.
-	port uint
+	// Port is the RabbitMQ server port number.
+	Port uint
 
-	// username is the RabbitMQ server allowed username.
-	username string
+	// Username is the RabbitMQ server allowed username.
+	Username string
 
-	// password is the RabbitMQ server allowed password.
-	password string
+	// Password is the RabbitMQ server allowed password.
+	Password string
 
-	// mode will specify whether logs are enabled or not.
-	mode string
+	// Vhost is used for CloudAMQP connections to set the specific vhost.
+	Vhost string
+
+	// UseTLS defines whether we use amqp or amqps protocol.
+	UseTLS bool
+
+	// Mode will specify whether logs are enabled or not.
+	Mode string
 }
 
 // DefaultManagerOptions will return a ManagerOptions with default values.
 func DefaultManagerOptions() *ManagerOptions {
 	return &ManagerOptions{
-		host:     defaultHost,
-		port:     defaultPort,
-		username: defaultUsername,
-		password: defaultPassword,
-		mode:     defaultMode,
+		Host:     defaultHost,
+		Port:     defaultPort,
+		Username: defaultUsername,
+		Password: defaultPassword,
+		Vhost:    defaultVhost,
+		UseTLS:   defaultUseTLS,
+		Mode:     defaultMode,
 	}
 }
 
@@ -37,22 +45,36 @@ func NewManagerOptions() *ManagerOptions {
 
 // SetHost will assign the host.
 func (m *ManagerOptions) SetHost(host string) *ManagerOptions {
-	m.host = host
+	m.Host = host
 
 	return m
 }
 
 // SetPort will assign the port.
 func (m *ManagerOptions) SetPort(port uint) *ManagerOptions {
-	m.port = port
+	m.Port = port
 
 	return m
 }
 
 // SetCredentials will assign the username and password.
 func (m *ManagerOptions) SetCredentials(username, password string) *ManagerOptions {
-	m.username = username
-	m.password = password
+	m.Username = username
+	m.Password = password
+
+	return m
+}
+
+// SetVhost will assign the Vhost.
+func (m *ManagerOptions) SetVhost(vhost string) *ManagerOptions {
+	m.Vhost = vhost
+
+	return m
+}
+
+// SetUseTLS will assign the UseTLS status.
+func (m *ManagerOptions) SetUseTLS(use bool) *ManagerOptions {
+	m.UseTLS = use
 
 	return m
 }
@@ -60,7 +82,7 @@ func (m *ManagerOptions) SetCredentials(username, password string) *ManagerOptio
 // SetMode will assign the mode if valid.
 func (m *ManagerOptions) SetMode(mode string) *ManagerOptions {
 	if isValidMode(mode) {
-		m.mode = mode
+		m.Mode = mode
 	}
 
 	return m

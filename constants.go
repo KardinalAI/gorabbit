@@ -8,12 +8,20 @@ import (
 // Library name.
 const libraryName = "Gorabbit"
 
+// Connection protocols.
+const (
+	defaultProtocol = "amqp"
+	securedProtocol = "amqps"
+)
+
 // Default values for the ClientOptions and ManagerOptions.
 const (
 	defaultHost                = "127.0.0.1"
 	defaultPort                = 5672
 	defaultUsername            = "guest"
 	defaultPassword            = "guest"
+	defaultVhost               = ""
+	defaultUseTLS              = false
 	defaultKeepAlive           = true
 	defaultRetryDelay          = 3 * time.Second
 	defaultMaxRetry            = 5

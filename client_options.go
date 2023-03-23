@@ -16,6 +16,12 @@ type ClientOptions struct {
 	// Password is the RabbitMQ server allowed password.
 	Password string
 
+	// Vhost is used for CloudAMQP connections to set the specific vhost.
+	Vhost string
+
+	// UseTLS defines whether we use amqp or amqps protocol.
+	UseTLS bool
+
 	// KeepAlive will determine whether the re-connection and retry mechanisms should be triggered.
 	KeepAlive bool
 
@@ -42,6 +48,8 @@ func DefaultClientOptions() *ClientOptions {
 		Port:                defaultPort,
 		Username:            defaultUsername,
 		Password:            defaultPassword,
+		Vhost:               defaultVhost,
+		UseTLS:              defaultUseTLS,
 		KeepAlive:           defaultKeepAlive,
 		RetryDelay:          defaultRetryDelay,
 		MaxRetry:            defaultMaxRetry,
@@ -75,6 +83,20 @@ func (c *ClientOptions) SetPort(port uint) *ClientOptions {
 func (c *ClientOptions) SetCredentials(username, password string) *ClientOptions {
 	c.Username = username
 	c.Password = password
+
+	return c
+}
+
+// SetVhost will assign the Vhost.
+func (c *ClientOptions) SetVhost(vhost string) *ClientOptions {
+	c.Vhost = vhost
+
+	return c
+}
+
+// SetUseTLS will assign the UseTLS status.
+func (c *ClientOptions) SetUseTLS(use bool) *ClientOptions {
+	c.UseTLS = use
 
 	return c
 }

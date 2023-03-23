@@ -7,10 +7,10 @@ import (
 )
 
 // MQTTClient is a simple MQTT interface that offers basic client operations such as:
-//	- Publishing
-//	- Consuming
-//	- Disconnecting
-//	- Ready and health checks
+//   - Publishing
+//   - Consuming
+//   - Disconnecting
+//   - Ready and health checks
 type MQTTClient interface {
 	// Disconnect launches the disconnection process.
 	// This operation disables to client permanently.
@@ -59,6 +59,9 @@ type mqttClient struct {
 	// Password is the RabbitMQ server allowed password.
 	Password string
 
+	// Vhost is used for CloudAMQP connections to set the specific vhost.
+	Vhost string
+
 	// logger defines the logger used, depending on the mode set.
 	logger logger
 
@@ -89,6 +92,7 @@ func NewClient(options *ClientOptions) MQTTClient {
 		Port:     options.Port,
 		Username: options.Username,
 		Password: options.Password,
+		Vhost:    options.Vhost,
 		logger:   &noLogger{},
 	}
 
@@ -114,7 +118,13 @@ func NewClient(options *ClientOptions) MQTTClient {
 
 	client.ctx, client.cancel = context.WithCancel(context.Background())
 
-	dialURL := fmt.Sprintf("amqp://%s:%s@%s:%d/", client.Username, client.Password, client.Host, client.Port)
+	protocol := defaultProtocol
+
+	if options.UseTLS {
+		protocol = securedProtocol
+	}
+
+	dialURL := fmt.Sprintf("%s://%s:%s@%s:%d/%s", protocol, client.Username, client.Password, client.Host, client.Port, client.Vhost)
 
 	client.connectionManager = newConnectionManager(
 		client.ctx,
