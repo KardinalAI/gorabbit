@@ -77,13 +77,13 @@ type amqpChannel struct {
 }
 
 // newConsumerChannel instantiates a new consumerChannel and amqpChannel for method inheritance.
-//	- ctx is the parent context.
-//	- connection is the parent amqp.Connection.
-//	- keepAlive will keep the channel alive if true.
-//	- retryDelay defines the delay between each retry, if the keepAlive flag is set to true.
-//	- consumer is the MessageConsumer that will hold consumption information.
-//	- maxRetry is the retry header for each message.
-//	- logger is the parent logger.
+//   - ctx is the parent context.
+//   - connection is the parent amqp.Connection.
+//   - keepAlive will keep the channel alive if true.
+//   - retryDelay defines the delay between each retry, if the keepAlive flag is set to true.
+//   - consumer is the MessageConsumer that will hold consumption information.
+//   - maxRetry is the retry header for each message.
+//   - logger is the parent logger.
 func newConsumerChannel(ctx context.Context, connection *amqp.Connection, keepAlive bool, retryDelay time.Duration, consumer *MessageConsumer, logger logger) *amqpChannel {
 	channel := &amqpChannel{
 		ctx:        ctx,
@@ -113,14 +113,14 @@ func newConsumerChannel(ctx context.Context, connection *amqp.Connection, keepAl
 }
 
 // newPublishingChannel instantiates a new publishingChannel and amqpChannel for method inheritance.
-//	- ctx is the parent context.
-//	- connection is the parent amqp.Connection.
-//	- keepAlive will keep the channel alive if true.
-//	- retryDelay defines the delay between each retry, if the keepAlive flag is set to true.
-//	- maxRetry defines the maximum number of times a message can be retried if its consumption failed.
-//	- publishingCacheSize is the maximum cache size of failed publishing.
-//	- publishingCacheTTL defines the time to live for each failed publishing that was put in cache.
-//	- logger is the parent logger.
+//   - ctx is the parent context.
+//   - connection is the parent amqp.Connection.
+//   - keepAlive will keep the channel alive if true.
+//   - retryDelay defines the delay between each retry, if the keepAlive flag is set to true.
+//   - maxRetry defines the maximum number of times a message can be retried if its consumption failed.
+//   - publishingCacheSize is the maximum cache size of failed publishing.
+//   - publishingCacheTTL defines the time to live for each failed publishing that was put in cache.
+//   - logger is the parent logger.
 func newPublishingChannel(ctx context.Context, connection *amqp.Connection, keepAlive bool, retryDelay time.Duration, maxRetry uint, publishingCacheSize uint64, publishingCacheTTL time.Duration, logger logger) *amqpChannel {
 	channel := &amqpChannel{
 		ctx:        ctx,

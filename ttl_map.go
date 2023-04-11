@@ -75,7 +75,5 @@ func (m *ttlMap[K, V]) Delete(k K) {
 
 	defer m.l.Unlock()
 
-	if _, ok := m.m[k]; ok {
-		delete(m.m, k)
-	}
+	delete(m.m, k)
 }

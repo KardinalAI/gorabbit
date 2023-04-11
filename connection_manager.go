@@ -12,9 +12,6 @@ type connectionManager struct {
 
 	// publisherConnection holds the independent publishing connection.
 	publisherConnection *amqpConnection
-
-	// logger is passed from the client for debugging purposes.
-	logger logger
 }
 
 // newConnectionManager instantiates a new connectionManager with given arguments.

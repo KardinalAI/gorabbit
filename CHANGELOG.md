@@ -1,3 +1,7 @@
+# 3.1.1
+
+Upgrade of Golangci-lint version from 1.45 to 1.52.
+
 # 3.1.0
 
 Added TLS and CloudAMQP support.

@@ -313,7 +313,7 @@ func (manager *mqttManager) PushMessageToExchange(exchange, routingKey string, p
 func (manager *mqttManager) PopMessageFromQueue(queue string, autoAck bool) (*amqp.Delivery, error) {
 	// Manager is disabled, so we do nothing and return no error.
 	if manager.disabled {
-		// nolint: nilnil // We must return <nil, nil>
+		//nolint: nilnil // We must return <nil, nil>
 		return nil, nil
 	}
 
