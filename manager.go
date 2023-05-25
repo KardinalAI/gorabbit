@@ -54,6 +54,18 @@ type MQTTManager interface {
 	// DeleteExchange permanently deletes an existing exchange.
 	// Returns an error if the connection to the RabbitMQ server is down or the exchange does not exist.
 	DeleteExchange(exchange string) error
+
+	// GetHost returns the host used to initialize the manager.
+	GetHost() string
+
+	// GetPort returns the port used to initialize the manager.
+	GetPort() uint
+
+	// GetUsername returns the username used to initialize the manager.
+	GetUsername() string
+
+	// GetVhost returns the vhost used to initialize the manager.
+	GetVhost() string
 }
 
 type mqttManager struct {
@@ -422,4 +434,20 @@ func (manager *mqttManager) ready() (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (manager *mqttManager) GetHost() string {
+	return manager.Host
+}
+
+func (manager *mqttManager) GetPort() uint {
+	return manager.Port
+}
+
+func (manager *mqttManager) GetUsername() string {
+	return manager.Username
+}
+
+func (manager *mqttManager) GetVhost() string {
+	return manager.Vhost
 }

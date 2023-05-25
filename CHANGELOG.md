@@ -1,9 +1,19 @@
+# 3.2.1
+
+Added getters methods for the `MQTTClient` and `MQTTManager`
+
+* `GetHost()` Returns the host used to initialize the client/manager.
+* `GetPort()` Returns the port used to initialize the client/manager.
+* `GetUsername()` Returns the username used to initialize the client/manager.
+* `GetVhost()` Returns the vhost used to initialize the client/manager.
+
 # 3.2.0
 
 Added support for instantiating a client and a manager from environment variables.
 
 * New `NewClientFromEnv` and `NewManagerFromEnv` constructors,
-* New `NewClientOptionsFromEnv` and `NewManagerOptionsFromEnv` methods that will parse environment variables into `ClientOptions` and `ManagerOptions` objects,
+* New `NewClientOptionsFromEnv` and `NewManagerOptionsFromEnv` methods that will parse environment variables
+  into `ClientOptions` and `ManagerOptions` objects,
 * Added a new model called `RabbitMQEnvs` to easily parse environment variables.
 * Updated documentation in the `README.md` file.
 

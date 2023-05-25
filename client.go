@@ -44,6 +44,18 @@ type MQTTClient interface {
 
 	// IsHealthy returns true if the client is ready (IsReady) and all channels are operating successfully.
 	IsHealthy() bool
+
+	// GetHost returns the host used to initialize the client.
+	GetHost() string
+
+	// GetPort returns the port used to initialize the client.
+	GetPort() uint
+
+	// GetUsername returns the username used to initialize the client.
+	GetUsername() string
+
+	// GetVhost returns the vhost used to initialize the client.
+	GetVhost() string
 }
 
 type mqttClient struct {
@@ -210,4 +222,20 @@ func (client *mqttClient) IsHealthy() bool {
 	}
 
 	return client.connectionManager.isHealthy()
+}
+
+func (client *mqttClient) GetHost() string {
+	return client.Host
+}
+
+func (client *mqttClient) GetPort() uint {
+	return client.Port
+}
+
+func (client *mqttClient) GetUsername() string {
+	return client.Username
+}
+
+func (client *mqttClient) GetVhost() string {
+	return client.Vhost
 }
