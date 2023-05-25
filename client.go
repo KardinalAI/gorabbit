@@ -87,6 +87,17 @@ func NewClient(options *ClientOptions) MQTTClient {
 		options = DefaultClientOptions()
 	}
 
+	return newClientFromOptions(options)
+}
+
+// NewClientFromEnv will instantiate a new MQTTClient from environment variables.
+func NewClientFromEnv() MQTTClient {
+	options := NewClientOptionsFromEnv()
+
+	return newClientFromOptions(options)
+}
+
+func newClientFromOptions(options *ClientOptions) MQTTClient {
 	client := &mqttClient{
 		Host:     options.Host,
 		Port:     options.Port,

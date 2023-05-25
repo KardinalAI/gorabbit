@@ -136,6 +136,25 @@ Finally, passing a `NewClientOptions()` method also initializes default values i
 client := gorabbit.NewClient(gorabbit.NewClientOptions())
 ```
 
+### Client with options from environment variables
+
+You can instantiate a client from environment variables, without the need of manually specifying options in the code.
+
+```go
+client := gorabbit.NewClientFromEnv()
+```
+
+Here are the following supported environment variables:
+
+* `RABBITMQ_HOST`: Defines the host,
+* `RABBITMQ_PORT`: Defines the port,
+* `RABBITMQ_USERNAME`: Defines the username,
+* `RABBITMQ_PASSWORD`: Defines the password,
+* `RABBITMQ_VHOST`: Defines the vhost,
+* `RABBITMQ_USE_TLS`: Defines whether to use TLS or no.
+
+**Note that environment variables are all optional, so missing keys will be replaced by their corresponding default.**
+
 ### Client with custom options
 
 We can input custom values for a specific property, either via the built-in builder or via direct struct initialization.
@@ -322,6 +341,25 @@ Finally, passing a `NewManagerOptions()` method also initializes default values 
 ```go
 manager := gorabbit.NewManager(gorabbit.NewManagerOptions())
 ```
+
+### Manager with options from environment variables
+
+You can instantiate a manager from environment variables, without the need of manually specifying options in the code.
+
+```go
+manager := gorabbit.NewManagerFromEnv()
+```
+
+Here are the following supported environment variables:
+
+* `RABBITMQ_HOST`: Defines the host,
+* `RABBITMQ_PORT`: Defines the port,
+* `RABBITMQ_USERNAME`: Defines the username,
+* `RABBITMQ_PASSWORD`: Defines the password,
+* `RABBITMQ_VHOST`: Defines the vhost,
+* `RABBITMQ_USE_TLS`: Defines whether to use TLS or no.
+
+**Note that environment variables are all optional, so missing keys will be replaced by their corresponding default.**
 
 ### Manager with custom options
 

@@ -1,5 +1,7 @@
 package gorabbit
 
+import "github.com/Netflix/go-env"
+
 // ManagerOptions holds all necessary properties to launch a successful connection with an MQTTManager.
 type ManagerOptions struct {
 	// Host is the RabbitMQ server host name.
@@ -41,6 +43,43 @@ func DefaultManagerOptions() *ManagerOptions {
 // Any non-assigned field will be set to default through DefaultManagerOptions.
 func NewManagerOptions() *ManagerOptions {
 	return DefaultManagerOptions()
+}
+
+// NewManagerOptionsFromEnv will generate a ManagerOptions from environment variables. Empty values will be taken as default
+// through the DefaultManagerOptions.
+func NewManagerOptionsFromEnv() *ManagerOptions {
+	defaultOpts := DefaultManagerOptions()
+
+	fromEnv := new(RabbitMQEnvs)
+
+	_, err := env.UnmarshalFromEnviron(fromEnv)
+	if err != nil {
+		return defaultOpts
+	}
+
+	if fromEnv.Host != "" {
+		defaultOpts.Host = fromEnv.Host
+	}
+
+	if fromEnv.Port > 0 {
+		defaultOpts.Port = fromEnv.Port
+	}
+
+	if fromEnv.Username != "" {
+		defaultOpts.Username = fromEnv.Username
+	}
+
+	if fromEnv.Password != "" {
+		defaultOpts.Password = fromEnv.Password
+	}
+
+	if fromEnv.Vhost != "" {
+		defaultOpts.Vhost = fromEnv.Vhost
+	}
+
+	defaultOpts.UseTLS = fromEnv.UseTLS
+
+	return defaultOpts
 }
 
 // SetHost will assign the host.

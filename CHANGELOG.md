@@ -1,3 +1,12 @@
+# 3.2.0
+
+Added support for instantiating a client and a manager from environment variables.
+
+* New `NewClientFromEnv` and `NewManagerFromEnv` constructors,
+* New `NewClientOptionsFromEnv` and `NewManagerOptionsFromEnv` methods that will parse environment variables into `ClientOptions` and `ManagerOptions` objects,
+* Added a new model called `RabbitMQEnvs` to easily parse environment variables.
+* Updated documentation in the `README.md` file.
+
 # 3.1.1
 
 Upgrade of Golangci-lint version from 1.45 to 1.52.

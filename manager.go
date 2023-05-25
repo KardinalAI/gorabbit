@@ -93,6 +93,17 @@ func NewManager(options *ManagerOptions) (MQTTManager, error) {
 		options = DefaultManagerOptions()
 	}
 
+	return newManagerFromOptions(options)
+}
+
+// NewManagerFromEnv will instantiate a new MQTTManager from environment variables.
+func NewManagerFromEnv() (MQTTManager, error) {
+	options := NewManagerOptionsFromEnv()
+
+	return newManagerFromOptions(options)
+}
+
+func newManagerFromOptions(options *ManagerOptions) (MQTTManager, error) {
 	manager := &mqttManager{
 		Host:     options.Host,
 		Port:     options.Port,

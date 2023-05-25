@@ -1,6 +1,10 @@
 package gorabbit
 
-import "time"
+import (
+	"time"
+
+	"github.com/Netflix/go-env"
+)
 
 // ClientOptions holds all necessary properties to launch a successful connection with an MQTTClient.
 type ClientOptions struct {
@@ -63,6 +67,43 @@ func DefaultClientOptions() *ClientOptions {
 // Any non-assigned field will be set to default through DefaultClientOptions.
 func NewClientOptions() *ClientOptions {
 	return DefaultClientOptions()
+}
+
+// NewClientOptionsFromEnv will generate a ClientOptions from environment variables. Empty values will be taken as default
+// through the DefaultClientOptions.
+func NewClientOptionsFromEnv() *ClientOptions {
+	defaultOpts := DefaultClientOptions()
+
+	fromEnv := new(RabbitMQEnvs)
+
+	_, err := env.UnmarshalFromEnviron(fromEnv)
+	if err != nil {
+		return defaultOpts
+	}
+
+	if fromEnv.Host != "" {
+		defaultOpts.Host = fromEnv.Host
+	}
+
+	if fromEnv.Port > 0 {
+		defaultOpts.Port = fromEnv.Port
+	}
+
+	if fromEnv.Username != "" {
+		defaultOpts.Username = fromEnv.Username
+	}
+
+	if fromEnv.Password != "" {
+		defaultOpts.Password = fromEnv.Password
+	}
+
+	if fromEnv.Vhost != "" {
+		defaultOpts.Vhost = fromEnv.Vhost
+	}
+
+	defaultOpts.UseTLS = fromEnv.UseTLS
+
+	return defaultOpts
 }
 
 // SetHost will assign the Host.
