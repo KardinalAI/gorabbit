@@ -6,6 +6,7 @@ Added getters methods for the `MQTTClient` and `MQTTManager`
 * `GetPort()` Returns the port used to initialize the client/manager.
 * `GetUsername()` Returns the username used to initialize the client/manager.
 * `GetVhost()` Returns the vhost used to initialize the client/manager.
+* `IsDisabled()` Returns whether the client is disabled or not.
 
 # 3.2.0
 

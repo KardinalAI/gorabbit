@@ -56,6 +56,9 @@ type MQTTClient interface {
 
 	// GetVhost returns the vhost used to initialize the client.
 	GetVhost() string
+
+	// IsDisabled returns whether the client is disabled or not.
+	IsDisabled() bool
 }
 
 type mqttClient struct {
@@ -238,4 +241,8 @@ func (client *mqttClient) GetUsername() string {
 
 func (client *mqttClient) GetVhost() string {
 	return client.Vhost
+}
+
+func (client *mqttClient) IsDisabled() bool {
+	return client.disabled
 }

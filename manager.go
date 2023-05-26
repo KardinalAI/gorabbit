@@ -66,6 +66,9 @@ type MQTTManager interface {
 
 	// GetVhost returns the vhost used to initialize the manager.
 	GetVhost() string
+
+	// IsDisabled returns whether the manager is disabled or not.
+	IsDisabled() bool
 }
 
 type mqttManager struct {
@@ -450,4 +453,8 @@ func (manager *mqttManager) GetUsername() string {
 
 func (manager *mqttManager) GetVhost() string {
 	return manager.Vhost
+}
+
+func (manager *mqttManager) IsDisabled() bool {
+	return manager.disabled
 }
