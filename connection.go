@@ -2,6 +2,7 @@ package gorabbit
 
 import (
 	"context"
+	"net/url"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -115,7 +116,7 @@ func (a *amqpConnection) open() error {
 		return errEmptyURI
 	}
 
-	a.logger.Debug("Connecting to RabbitMQ server", logField{Key: "uri", Value: a.uri})
+	a.logger.Debug("Connecting to RabbitMQ server", logField{Key: "uri", Value: a.uriForLog()})
 
 	// We request a connection from the RabbitMQ server.
 	conn, err := amqp.Dial(a.uri)
@@ -125,7 +126,7 @@ func (a *amqpConnection) open() error {
 		return err
 	}
 
-	a.logger.Info("Connection successful", logField{Key: "uri", Value: a.uri})
+	a.logger.Info("Connection successful", logField{Key: "uri", Value: a.uriForLog()})
 
 	a.connection = conn
 
@@ -282,4 +283,24 @@ func (a *amqpConnection) publish(exchange, routingKey string, payload []byte, op
 	}
 
 	return publishingChannel.publish(exchange, routingKey, payload, options)
+}
+
+// uriForLog returns the uri with the password hidden for security measures.
+func (a *amqpConnection) uriForLog() string {
+	if a.uri == "" {
+		return a.uri
+	}
+
+	parsedURL, err := url.Parse(a.uri)
+	if err != nil {
+		return ""
+	}
+
+	hiddenPassword := "xxxx"
+
+	if parsedURL.User != nil {
+		parsedURL.User = url.UserPassword(parsedURL.User.Username(), hiddenPassword)
+	}
+
+	return parsedURL.String()
 }

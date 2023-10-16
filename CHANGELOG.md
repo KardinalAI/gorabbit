@@ -1,3 +1,11 @@
+# 3.2.2
+
+Hide password from connection debug logs
+
+* Replaced occurrences of logs for `a.uri` by `a.uriForLog()`,
+* Added new receiver method for `amqpConnection`: `uriForLog()` that parses the uri, replaces the password by `xxxx` and
+  returns the new uri.
+
 # 3.2.1
 
 Added getters methods for the `MQTTClient` and `MQTTManager`
