@@ -1,3 +1,7 @@
+# 3.2.3
+
+Hide password from connection debug logs, missing log fix.
+
 # 3.2.2
 
 Hide password from connection debug logs

@@ -96,7 +96,7 @@ func newConnection(ctx context.Context, uri string, keepAlive bool, retryDelay t
 		connectionType: connectionType,
 	}
 
-	conn.logger.Debug("Initializing new amqp connection", logField{Key: "uri", Value: uri})
+	conn.logger.Debug("Initializing new amqp connection", logField{Key: "uri", Value: conn.uriForLog()})
 
 	// We open an initial connection.
 	err := conn.open()
