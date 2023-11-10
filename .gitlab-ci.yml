@@ -2,11 +2,14 @@ stages:
   - test
 
 TEST-library:
-  before_script:
-    - git config --global url.https://oauth2:"${GITLAB_TOKEN}"@gitlab.kardinal.ai/.insteadOf https://gitlab.kardinal.ai/
   stage: test
-  image: golang:1.18-stretch
+  image: golang:1.20-alpine
+  before_script:
+    - apk --no-cache add git build-base
+    - git config --global url.https://oauth2:"${GITLAB_TOKEN}"@gitlab.kardinal.ai/.insteadOf https://gitlab.kardinal.ai/
   script:
+    # Enable CGO
+    - export CGO_ENABLED=1
     # go formatting analysis
     - /bin/sh -c 'if [ -n "$(gofmt -l .)" ]; then gofmt -d .; exit 1; fi'
     # GO code quality analysis

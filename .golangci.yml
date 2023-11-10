@@ -13,9 +13,9 @@ linters-settings:
     check-type-assertions: true # default false
     check-blank: false # default false
     ignore: "fmt:.*" # default fmt:.*
-    exclude-functions: [ ] # see https://github.com/kisielk/errcheck#excluding-functions for details # default []
+    exclude-functions: [] # see https://github.com/kisielk/errcheck#excluding-functions for details # default []
   gosimple:
-    go: "1.18" # default 1.13
+    go: "1.20" # default 1.13
     checks: [ "*" ] # https://staticcheck.io/docs/options#checks # default ["*"]
   govet:
     enable-all: true
@@ -25,8 +25,10 @@ linters-settings:
       shadow:
         strict: true # default false
   staticcheck:
-    go: "1.18" # default 1.13
-    checks: [ "*" ] # https://staticcheck.io/docs/options#checks # default ["*"]
+    go: "1.20" # default 1.13
+    checks:
+      - "*" # https://staticcheck.io/docs/options#checks # default ["*"]
+      - "-SA1019" # Removed DEPRACATED subgroup to be able to use "deprecated" tag only in structs.
   structcheck:
     exported-fields: false # default false
   unused:
@@ -112,7 +114,7 @@ linters-settings:
     min-complexity: 30 # default 30
   godot:
     scope: declarations # comments to be checked: `declarations` (default), `toplevel`, or `all`
-    exclude: [ ] # list of regexps for excluding particular comment lines from check # default []
+    exclude: [] # list of regexps for excluding particular comment lines from check # default []
     capital: false # check that each sentence starts with a capital letter # default false
     period: true # check that each sentence ends with a period # default true
   gomnd:
@@ -126,22 +128,22 @@ linters-settings:
       - assign
     # List of numbers to exclude from analysis. The numbers should be written as string.
     # Following values always ignored: "1", "1.0", "0" and "0.0"
-    ignored-numbers: [ ] # default []
+    ignored-numbers: [] # default []
     # List of file patterns to exclude from analysis.
     # Following values always ignored: `.+_test.go`
-    ignored-files: [ ] # default []
+    ignored-files: [] # default []
     # List of function patterns to exclude from analysis.
     # Following functions always ignored: `time.Date`
-    ignored-functions: [ "strconv.ParseUint" ] # default []
+    ignored-functions: ["strconv.ParseUint"] # default []
   gomoddirectives:
-    replace-allow-list: [ ] # list of allowed `replace` directives # default []
+    replace-allow-list: [] # list of allowed `replace` directives # default []
     replace-local: false # allow local `replace` directives # default false
     exclude-forbidden: false # forbid the use of `exclude` directives # default false
     retract-allow-no-explanation: false # allow to use `retract` directives without explanation # default false
   gomodguard:
     allowed:
-      modules: [ ] # default []
-      domains: [ ] # default []
+      modules: [] # default []
+      domains: [] # default []
     blocked:
       modules:
         - github.com/golang/protobuf:
@@ -156,7 +158,7 @@ linters-settings:
             recommendations:
               - github.com/google/uuid
             reason: "see recommendation from dev-infra team: https://confluence.gtforge.com/x/gQI6Aw"
-      versions: [ ] # default []
+      versions: [] # default []
       local_replace_directives: true # default false
   lll:
     line-length: 120 # default 120
@@ -169,7 +171,7 @@ linters-settings:
     ignore-words:
       - "" # default: ""
   nakedret:
-    max-func-lines: 30 # default 30
+    max-func-lines: 0 # default 30
   nestif:
     min-complexity: 4 # default 5
   nilnil:
@@ -182,7 +184,7 @@ linters-settings:
   nolintlint:
     allow-unused: false # default false
     allow-leading-space: true # default true
-    allow-no-explanation: [ funlen, gocognit, lll ] # default []
+    allow-no-explanation: [funlen, gocognit, lll] # default []
     require-explanation: true # default false
     require-specific: true # default false
   prealloc:
@@ -216,7 +218,7 @@ linters-settings:
     # There is a list of default rules, but it can be redefined, see https://github.com/mgechev/revive#available-rules
     rules:
       - name: "var-naming"
-        arguments: [ [ "ID" ], [ ] ]
+        arguments: [["ID"], []]
   #  - name: "xxx"
   #    disabled: false
   #    arguments: []
@@ -242,52 +244,60 @@ linters-settings:
   unparam:
     check-exported: true # default false
   wrapcheck:
-    ignoreSigs: [ ] # specifies substrings of signatures to ignore. Overrides default https://github.com/tomarrell/wrapcheck#configuration # default []
-    ignoreSigRegexps: [ ] # this is similar to the ignoreSigs, but gives slightly more flexibility # default []
-    ignorePackageGlobs: [ ] # see https://github.com/tomarrell/wrapcheck#configuration # default []
+    ignoreSigs: [] # specifies substrings of signatures to ignore. Overrides default https://github.com/tomarrell/wrapcheck#configuration # default []
+    ignoreSigRegexps: [] # this is similar to the ignoreSigs, but gives slightly more flexibility # default []
+    ignorePackageGlobs: [] # see https://github.com/tomarrell/wrapcheck#configuration # default []
 
 linters:
   disable-all: true
   enable:
     ## enabled by default
-    - deadcode
+    # - deadcode
     - errcheck
     - gosimple
     - govet
     - ineffassign
     - staticcheck
-    - structcheck
+    # - structcheck
     - typecheck
     - unused
-    - varcheck
+    # - varcheck
     ## disabled by default
     - asciicheck
     - bidichk
     - bodyclose
+    # - containedctx
     - contextcheck
     - cyclop
+    - decorder
+    - dogsled
     - dupl
     - durationcheck
+    - errchkjson
     - errname
     - errorlint
     - exhaustive
     - exportloopref
     - funlen
-    - gochecknoglobals
+    # gochecknoglobals
     - gochecknoinits
     # - gocognit # NEED
     - goconst
     - gocritic
     - gocyclo
     - godot
+    # - godox
     - goimports
     - gomnd
     - gomoddirectives
     - gomodguard
     - goprintffuncname
     - gosec
-    - ifshort
+    - grouper
+    # - ifshort
+    - importas
     # - lll # long long lines
+    - maintidx
     - makezero
     - nakedret
     - nestif
@@ -303,6 +313,7 @@ linters:
     - sqlclosecheck
     - tenv
     - testpackage
+    - thelper
     - tparallel
     - unconvert
     - unparam
@@ -310,25 +321,17 @@ linters:
     - whitespace
     - wsl
     ## disabled
-    #- containedctx # is not used - linter that detects struct contained context.Context field
-    #- decorder # is not used - a declaration order and number linter for golang
     #- depguard # replaced with gomodguard
-    #- dogsled # is not used - сhecks assignments with too many blank identifiers (e.g. x, _, _, _, := f())
-    #- errchkjson # is not used - checks types that are json encoded - reports unsupported types and unnecessary error checks
     #- exhaustivestruct # too strict - finds structs that have uninitialized fields # TODO: maybe enable for some packages?
     #- forbidigo # Forbids identifiers
     #- forcetypeassert # errcheck is used instead
     #- gci # is not used - sorts imports
-    #- godox # is not used - complains about TODOs in comments
     #- goerr113 # too strict - checks the errors handling expressions
     #- gofumpt # replaced with goimports, gofumports is not available yet
     #- goheader # is not used - checks that each file has the licence at the beginning
     #- golint # deprecated - revive is used instead
-    #- grouper # is not used - analyze expression groups, require 'import' declaration groups
-    #- importas # is not used - enforces consistent import aliases
     #- interfacer # deprecated and has false positives
     #- ireturn # good, but too strict - accept interfaces, return concrete types
-    #- maintidx # is not used - measures the maintainability index of each function
     #- maligned # deprecated
     #- misspell # useless - correct commonly misspelled English words... quickly
     #- nlreturn # too strict - requires a new line before return and branch statements
@@ -336,7 +339,6 @@ linters:
     #- scopelint # deprecated
     #- stylecheck # revive does the same
     #- tagliatelle # is not used - checks the struct tags
-    #- thelper # is not used - requires to use t.Helper()
     #- wrapcheck # too strict - requires wrapping errors from external packages (even from the same repo) and interfaces
     #- varnamelen # great idea, but too many false positives - checking length of variable's name matches its usage scope
 

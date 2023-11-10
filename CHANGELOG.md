@@ -1,3 +1,13 @@
+# 3.2.4
+
+**Version Updates**
+
+* Updated go version to 1.20,
+* Updated `github.com/rabbitmq/amqp091-go` to version 1.9.0
+* Updated all other project dependencies,
+* Updated `.gitlab-ci.yml` file,
+* Updated `.golangci.yml` file.
+
 # 3.2.3
 
 Hide password from connection debug logs, missing log fix.
