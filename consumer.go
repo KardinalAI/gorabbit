@@ -170,7 +170,7 @@ func (mh MQTTMessageHandlers) FindFunc(routingKey string) MQTTMessageHandlerFunc
 		// Split the registered key into individual words.
 		storedWords := strings.Split(key, ".")
 
-		// nolint: gocritic,nestif // We need this if-else block
+		//nolint: gocritic,nestif // We need this if-else block
 		if storedWords[0] == "#" {
 			if !mh.matchesPrefixWildcard(storedWords, words) {
 				continue
