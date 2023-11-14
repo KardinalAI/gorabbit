@@ -1,3 +1,24 @@
+# 3.3.0
+
+Added reverse key matching capabilities
+
+* Handler's routing keys are now validated when registered, to make sure that wildcards are correct,
+* Enhanced subscriptions handler finding withing reverse key matching capabilities that adhere to
+  MQTT's wildcards for routing keys. For example, we can go from:
+    ```go
+    messageHandlers := gorabbit.MQTTMessageHandlers{
+      "event.module.user.created": userHandler,
+      "event.module.user.updated": userHandler,
+      "event.module.user.deleted": userHandler,
+    }
+    ```
+    to:
+    ```go
+    messageHandlers := gorabbit.MQTTMessageHandlers{
+      "event.module.user.*": userHandler,
+    }    
+    ```
+
 # 3.2.4
 
 **Version Updates**
