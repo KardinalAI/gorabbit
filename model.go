@@ -4,6 +4,36 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+type SchemaDefinitions struct {
+	Exchanges []struct {
+		Name       string `json:"name"`
+		Vhost      string `json:"vhost"`
+		Type       string `json:"type"`
+		Durable    bool   `json:"durable"`
+		AutoDelete bool   `json:"auto_delete"`
+		Internal   bool   `json:"internal"`
+		Arguments  struct {
+		} `json:"arguments"`
+	} `json:"exchanges"`
+	Queues []struct {
+		Name       string `json:"name"`
+		Vhost      string `json:"vhost"`
+		Durable    bool   `json:"durable"`
+		AutoDelete bool   `json:"auto_delete"`
+		Arguments  struct {
+		} `json:"arguments"`
+	} `json:"queues"`
+	Bindings []struct {
+		Source          string `json:"source"`
+		Vhost           string `json:"vhost"`
+		Destination     string `json:"destination"`
+		DestinationType string `json:"destination_type"`
+		RoutingKey      string `json:"routing_key"`
+		Arguments       struct {
+		} `json:"arguments"`
+	} `json:"bindings"`
+}
+
 type ExchangeConfig struct {
 	Name      string                 `yaml:"name"`
 	Type      ExchangeType           `yaml:"type"`

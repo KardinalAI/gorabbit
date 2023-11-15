@@ -42,6 +42,7 @@ This wrapper depends on the official [Go RabbitMQ plugin](https://github.com/rab
         * [Purge Queue](#purge-queue)
         * [Delete Queue](#delete-queue)
         * [Delete Exchange](#delete-exchange)
+        * [Setup From Definitions](#setup-from-schema-definition-file)
 
 ## Installation
 
@@ -508,6 +509,20 @@ Deletes a given exchange.
 ```go
 err := manager.DeleteExchange("events_exchange")
 ```
+
+#### Setup from schema definition file
+
+You can setup exchanges, queues and bindings automatically by referencing a 
+[RabbitMQ Schema Definition](assets/definitions.example.json) JSON file.
+
+```go
+err := manager.SetupFromDefinitions("/path/to/definitions.json")
+```
+
+> :warning: The standard RabbitMQ definitions file contains configurations for
+> `users`, `vhosts` and `permissions`. Those configurations are not taken into consideration
+> in the `SetupFromDefinitions` method.
+
 
 ## Launch Local RabbitMQ Server
 

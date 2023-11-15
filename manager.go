@@ -55,6 +55,9 @@ type MQTTManager interface {
 	// Returns an error if the connection to the RabbitMQ server is down or the exchange does not exist.
 	DeleteExchange(exchange string) error
 
+	// SetupFromDefinitions loads a definitions.json file and automatically sets up exchanges, queues and bindings.
+	SetupFromDefinitions(path string) error
+
 	// GetHost returns the host used to initialize the manager.
 	GetHost() string
 
@@ -418,6 +421,69 @@ func (manager *mqttManager) DeleteExchange(exchange string) error {
 
 	// We delete the exchange via the channel.
 	return manager.channel.ExchangeDelete(exchange, false, false)
+}
+
+func (manager *mqttManager) SetupFromDefinitions(path string) error {
+	// Manager is disabled, so we do nothing and return no error.
+	if manager.disabled {
+		return nil
+	}
+
+	// If the manager is not ready, we return its error.
+	if ready, err := manager.ready(); !ready {
+		return err
+	}
+
+	// We read the definitions.json file.
+	definitions, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	def := new(SchemaDefinitions)
+
+	// We parse the definitions.json file into the corresponding struct.
+	err = json.Unmarshal(definitions, def)
+	if err != nil {
+		return err
+	}
+
+	for _, queue := range def.Queues {
+		// We create the queue.
+		err = manager.CreateQueue(QueueConfig{
+			Name:      queue.Name,
+			Durable:   queue.Durable,
+			Exclusive: false,
+		})
+
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, exchange := range def.Exchanges {
+		// We create the exchange.
+		err = manager.CreateExchange(ExchangeConfig{
+			Name:      exchange.Name,
+			Type:      ExchangeType(exchange.Type),
+			Persisted: exchange.Durable,
+		})
+
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, binding := range def.Bindings {
+		// We bind the given exchange to the given queue via the given routing key.
+		err = manager.BindExchangeToQueueViaRoutingKey(binding.Source, binding.Destination, binding.RoutingKey)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (manager *mqttManager) ready() (bool, error) {

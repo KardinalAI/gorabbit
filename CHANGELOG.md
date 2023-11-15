@@ -1,6 +1,6 @@
 # 3.3.0
 
-Added reverse key matching capabilities
+**Added reverse key matching capabilities**
 
 * Handler's routing keys are now validated when registered, to make sure that wildcards are correct,
 * Enhanced subscriptions handler finding withing reverse key matching capabilities that adhere to
@@ -12,12 +12,18 @@ Added reverse key matching capabilities
       "event.module.user.deleted": userHandler,
     }
     ```
-    to:
+  to:
     ```go
     messageHandlers := gorabbit.MQTTMessageHandlers{
       "event.module.user.*": userHandler,
     }    
     ```
+
+**Improved manager capabilities**
+
+* The manager has a new `SetupFromDefinitions` method that allows setting up exchanges, queues and bindings
+  from a RabbitMQ Schema Definition file,
+* Added a new model `SchemaDefinitions` to properly parse the definitions JSON file.
 
 # 3.2.4
 
