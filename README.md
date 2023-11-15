@@ -1,6 +1,8 @@
 # Gorabbit
 
-<img src="assets/gorabbit-logo-sm.jpg" alt="logo" width="256"/>
+<p style="text-align: center">
+    <img src="assets/gorabbit-logo-sm.jpg" alt="logo" width="256" style="border-radius:50%"/>
+</p>
 
 Gorabbit is a wrapper that provides high level and robust RabbitMQ operations through a client or a manager.
 
