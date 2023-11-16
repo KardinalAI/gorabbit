@@ -508,7 +508,7 @@ func (manager *mqttManager) ready() (bool, error) {
 		return false, errConnectionClosed
 	}
 
-	// We check the channel as it might have been closed, and we need the request a new one.
+	// We check the channel as it might have been closed, and we need to request a new one.
 	if err := manager.checkChannel(); err != nil {
 		return false, err
 	}

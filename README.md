@@ -280,7 +280,7 @@ err := client.RegisterConsumer(gorabbit.MessageConsumer{
 * ConcurrentProcess: Asynchronous handling of deliveries
 * Handlers: A list of handlers for specified routes
 
-**NB:** [RabbitMQ Wildcards](https://gitlab.kardinal.ai/coretech/amina/-/merge_requests/155) are also supported. 
+**NB:** [RabbitMQ Wildcards](https://www.cloudamqp.com/blog/rabbitmq-topic-exchange-explained.html) are also supported. 
 If multiple routing keys have the same handler, a wildcard can be used, for example: 
 `event.foo.bar.*` or `event.foo.#`. 
 
