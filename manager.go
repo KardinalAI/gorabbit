@@ -486,6 +486,17 @@ func (manager *mqttManager) SetupFromDefinitions(path string) error {
 	return nil
 }
 
+func (manager *mqttManager) checkChannel() error {
+	var err error
+
+	// If the connection is nil or closed, we must request a new channel.
+	if manager.channel == nil || manager.channel.IsClosed() {
+		manager.channel, err = manager.connection.Channel()
+	}
+
+	return err
+}
+
 func (manager *mqttManager) ready() (bool, error) {
 	// Manager is disabled, so we do nothing and return no error.
 	if manager.disabled {
@@ -497,7 +508,12 @@ func (manager *mqttManager) ready() (bool, error) {
 		return false, errConnectionClosed
 	}
 
-	// If the channel is nil or closed, we return an error because the manager is not ready.
+	// We check the channel as it might have been closed, and we need the request a new one.
+	if err := manager.checkChannel(); err != nil {
+		return false, err
+	}
+
+	// If the channel is still nil or closed, we return an error because the manager is not ready.
 	if manager.channel == nil || manager.channel.IsClosed() {
 		return false, errChannelClosed
 	}
