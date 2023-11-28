@@ -1,3 +1,9 @@
+# 3.3.1
+
+**Minor Evolution**
+
+Added a release logger for `amqpChannel` to log warnings no matter `GORABBIT_MODE`.
+
 # 3.3.0
 
 **Added reverse key matching capabilities**

@@ -72,6 +72,9 @@ type amqpChannel struct {
 	// logger logs events.
 	logger logger
 
+	// releaseLogger forces logs not matter the mode. It is used to log important things.
+	releaseLogger logger
+
 	// connectionType defines the connectionType.
 	connectionType connectionType
 }
@@ -96,6 +99,16 @@ func newConsumerChannel(ctx context.Context, connection *amqp.Connection, keepAl
 			"consumer": consumer.Name,
 			"queue":    consumer.Queue,
 		}),
+		releaseLogger: &stdLogger{
+			logger:     newLogrus(),
+			identifier: libraryName,
+			logFields: map[string]interface{}{
+				"context":  "channel",
+				"type":     connectionTypeConsumer,
+				"consumer": consumer.Name,
+				"queue":    consumer.Queue,
+			},
+		},
 		connectionType:    connectionTypeConsumer,
 		consumptionHealth: make(consumptionHealth),
 		consumer:          consumer,
@@ -131,6 +144,14 @@ func newPublishingChannel(ctx context.Context, connection *amqp.Connection, keep
 			"context": "channel",
 			"type":    connectionTypePublisher,
 		}),
+		releaseLogger: &stdLogger{
+			logger:     newLogrus(),
+			identifier: libraryName,
+			logFields: map[string]interface{}{
+				"context": "channel",
+				"type":    connectionTypePublisher,
+			},
+		},
 		connectionType:  connectionTypePublisher,
 		publishingCache: newTTLMap[string, mqttPublishing](publishingCacheSize, publishingCacheTTL),
 		maxRetry:        maxRetry,
@@ -351,6 +372,12 @@ func (c *amqpChannel) consume() {
 
 	if err != nil {
 		c.logger.Error(err, "Could not consume messages")
+
+		// If the queue does not exist yet, we want to force a release log with a warning for better visibility.
+		if isErrorNotFound(err) {
+			c.releaseLogger.Warn("Queue does not exist", logField{Key: "queue", Value: c.consumer.Queue})
+		}
+
 		return
 	}
 
@@ -554,6 +581,11 @@ func (c *amqpChannel) publish(exchange string, routingKey string, payload []byte
 	// If the message could not be sent we return an error without caching it.
 	if err != nil {
 		c.logger.Error(err, "Could not publish message")
+
+		// If the exchange does not exist yet, we want to force a release log with a warning for better visibility.
+		if isErrorNotFound(err) {
+			c.releaseLogger.Warn("The MQTT message was not sent, exchange does not exist", logField{Key: "exchange", Value: exchange}, logField{Key: "routingKey", Value: routingKey})
+		}
 
 		return err
 	}
