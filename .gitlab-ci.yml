@@ -5,8 +5,7 @@ TEST-library:
   stage: test
   image: golang:1.20-alpine
   before_script:
-    - apk --no-cache add git build-base
-    - git config --global url.https://oauth2:"${GITLAB_TOKEN}"@gitlab.kardinal.ai/.insteadOf https://gitlab.kardinal.ai/
+    - apk --no-cache add build-base
   script:
     # Enable CGO
     - export CGO_ENABLED=1
@@ -22,7 +21,5 @@ TEST-library:
 TEST-lint:
   stage: test
   image: golangci/golangci-lint:v1.52-alpine
-  before_script:
-    - git config --global url.https://oauth2:"${GITLAB_TOKEN}"@gitlab.kardinal.ai/.insteadOf https://gitlab.kardinal.ai/
   script:
     - golangci-lint run -v

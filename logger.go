@@ -86,13 +86,13 @@ func (l stdLogger) Debug(s string, fields ...logField) {
 // noLogger does not log at all, this is the default.
 type noLogger struct{}
 
-func (l noLogger) Error(err error, s string, fields ...logField) {}
+func (l noLogger) Error(_ error, _ string, _ ...logField) {}
 
-func (l noLogger) Warn(s string, fields ...logField) {}
+func (l noLogger) Warn(_ string, _ ...logField) {}
 
-func (l noLogger) Info(s string, fields ...logField) {}
+func (l noLogger) Info(_ string, _ ...logField) {}
 
-func (l noLogger) Debug(s string, fields ...logField) {}
+func (l noLogger) Debug(_ string, _ ...logField) {}
 
 func newLogrus() *logrus.Logger {
 	log := &logrus.Logger{

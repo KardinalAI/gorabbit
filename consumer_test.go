@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"gitlab.kardinal.ai/coretech/gorabbit/v3"
+	"github.com/KardinalAI/gorabbit"
 )
 
 func TestMQTTMessageHandlers_Validate(t *testing.T) {
@@ -16,11 +16,11 @@ func TestMQTTMessageHandlers_Validate(t *testing.T) {
 	}{
 		{
 			handlers: gorabbit.MQTTMessageHandlers{
-				"event.paola.#":            func(payload []byte) error { return nil },
-				"event.phoebe.*.generated": func(payload []byte) error { return nil },
-				"event.*.space.boom":       func(payload []byte) error { return nil },
-				"*.toto.order.passed":      func(payload []byte) error { return nil },
-				"#.toto":                   func(payload []byte) error { return nil },
+				"event.user.#":            func(payload []byte) error { return nil },
+				"event.email.*.generated": func(payload []byte) error { return nil },
+				"event.*.space.boom":      func(payload []byte) error { return nil },
+				"*.toto.order.passed":     func(payload []byte) error { return nil },
+				"#.toto":                  func(payload []byte) error { return nil },
 			},
 			expectedError: nil,
 		},
@@ -83,11 +83,11 @@ func TestMQTTMessageHandlers_Validate(t *testing.T) {
 
 func TestMQTTMessageHandlers_FindFunc(t *testing.T) {
 	handlers := gorabbit.MQTTMessageHandlers{
-		"event.paola.#":            func(payload []byte) error { return nil },
-		"event.phoebe.*.generated": func(payload []byte) error { return nil },
-		"event.*.space.boom":       func(payload []byte) error { return nil },
-		"*.toto.order.passed":      func(payload []byte) error { return nil },
-		"#.toto":                   func(payload []byte) error { return nil },
+		"event.user.#":            func(payload []byte) error { return nil },
+		"event.email.*.generated": func(payload []byte) error { return nil },
+		"event.*.space.boom":      func(payload []byte) error { return nil },
+		"*.toto.order.passed":     func(payload []byte) error { return nil },
+		"#.toto":                  func(payload []byte) error { return nil },
 	}
 
 	tests := []struct {
@@ -95,27 +95,27 @@ func TestMQTTMessageHandlers_FindFunc(t *testing.T) {
 		shouldMatch bool
 	}{
 		{
-			input:       "event.paola.plan.generated",
+			input:       "event.user.plan.generated",
 			shouldMatch: true,
 		},
 		{
-			input:       "event.paola.plan.generated.before.awakening.the.titan",
+			input:       "event.user.password.generated.before.awakening.the.titan",
 			shouldMatch: true,
 		},
 		{
-			input:       "event.phoebe.order.generated",
+			input:       "event.email.subject.generated",
 			shouldMatch: true,
 		},
 		{
-			input:       "event.phoebe.toto.generated",
+			input:       "event.email.toto.generated",
 			shouldMatch: true,
 		},
 		{
-			input:       "event.phoebe.titi.generated",
+			input:       "event.email.titi.generated",
 			shouldMatch: true,
 		},
 		{
-			input:       "event.phoebe.order.created",
+			input:       "event.email.order.created",
 			shouldMatch: false,
 		},
 		{

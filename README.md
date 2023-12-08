@@ -49,22 +49,7 @@ This wrapper depends on the official [Go RabbitMQ plugin](https://github.com/rab
 ### Go module
 
 ```bash
-go get gitlab.kardinal.ai/coretech/gorabbit/v3
-```
-
-### Possible issues
-
-If you get an error regarding the host not found, run the following command:
-
-```bash
-git config --global --add url.git@gitlab.kardinal.ai:.insteadOf https://gitlab.kardinal.ai/
-```
-
-If you are having trouble updating the package to the latest version, run the following commands:
-
-```bash
-go env -w GONOPROXY="gitlab.kardinal.ai/*"
-go env -w GONOSUMDB="gitlab.kardinal.ai/*"
+go get github.com/KardinalAI/gorabbit
 ```
 
 ### Environment variables
@@ -523,7 +508,6 @@ err := manager.SetupFromDefinitions("/path/to/definitions.json")
 > `users`, `vhosts` and `permissions`. Those configurations are not taken into consideration
 > in the `SetupFromDefinitions` method.
 
-
 ## Launch Local RabbitMQ Server
 
 To run a local rabbitMQ server quickly with a docker container, simply run the following command:
@@ -534,3 +518,6 @@ docker run -it --rm --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-manag
 
 It will launch a local RabbitMQ server mapped on port 5672, and the management dashboard will be mapped on
 port 15672 accessible on localhost:15672 with a username "guest" and password "guest".
+
+## License
+**Gorabbit** is licensed under the [MIT](LICENSE).
