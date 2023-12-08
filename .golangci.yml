@@ -1,4 +1,4 @@
-## Golden config for golangci-lint v1.45.2
+## Golden config for golangci-lint v1.52.2
 #
 # This is the best config for golangci-lint based on my experience and opinion.
 # It is very strict, but not extremely strict.
