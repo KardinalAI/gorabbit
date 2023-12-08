@@ -1,6 +1,6 @@
 # Gorabbit
 
-<p style="text-align: center">
+<p align="center">
     <img src="assets/gorabbit-logo-sm.jpg" alt="logo" width="256" style="border-radius:50%"/>
 </p>
 
