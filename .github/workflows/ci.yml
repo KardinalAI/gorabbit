@@ -1,33 +1,24 @@
 name: CI
 
-on:
-  push:
-    branches:
-      - main
+on: [push]
 
 jobs:
   test-library:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: [ 1.20 ]
+        go-version: [ '1.19', '1.20', '1.21.x' ]
 
     steps:
-      - name: Set up Go
-        uses: actions/setup-go@v2
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go }}
+          go-version: ${{ matrix.go-version }}
 
-      - name: Check out code
-        uses: actions/checkout@v2
-
-      - name: Install build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential
-
-      - name: Enable CGO
-        run: export CGO_ENABLED=1
+      - name: Install dependencies
+        run: go get .
 
       - name: Go formatting analysis
         run: |
@@ -45,29 +36,25 @@ jobs:
           go tool cover -func=coverage.out
 
       - name: Upload coverage results
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: coverage
           path: coverage.out
-
-      - name: Coverage percentage
-        id: coverage
-        run:
-          echo "Coverage: ${{ steps.coverage.outputs.percentage }}"
 
   test-lint:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Set up Go
-        uses: actions/setup-go@v2
+      - uses: actions/checkout@v4
 
-      - name: Check out code
-        uses: actions/checkout@v2
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go-version }}
 
       - name: Install golangci-lint
         run: |
-          curl -sSfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s v1.52.3
+          curl -sSfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s v1.52.2
 
       - name: Run golangci-lint
         run: ./bin/golangci-lint run -v
