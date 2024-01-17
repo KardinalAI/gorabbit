@@ -30,7 +30,7 @@ it together.
 
 We welcome contributions in the form of pull requests. If you want to contribute code, please follow these guidelines:
 
-1. Fork the repository and create your branch from `main`.
+1. Fork the repository and create your branch from `v1`.
 2. Make sure your code adheres to the [Go coding standards](https://golang.org/doc/effective_go).
 3. Make sure your code respects all [linting rules](./.golangci.yml) using [golangci-lint](https://golangci-lint.run/)
    version 1.52.2.
