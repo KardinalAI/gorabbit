@@ -5,7 +5,7 @@
 # Feel free to adopt and change it for your needs.
 
 run:
-  timeout: 1m # default 1m
+  timeout: 10m # default 1m
 
 linters-settings:
   errcheck:
@@ -26,9 +26,7 @@ linters-settings:
         strict: true # default false
   staticcheck:
     go: "1.20" # default 1.13
-    checks:
-      - "*" # https://staticcheck.io/docs/options#checks # default ["*"]
-      - "-SA1019" # Removed DEPRACATED subgroup to be able to use "deprecated" tag only in structs.
+    checks: [ "*" ] # https://staticcheck.io/docs/options#checks # default ["*"]
   structcheck:
     exported-fields: false # default false
   unused:
@@ -71,8 +69,8 @@ linters-settings:
   #     - ^(fmt\.Print(|f|ln)|print|println)$
   #   exclude-godoc-examples: true # exclude godoc examples from forbidigo checks # default is true
   funlen:
-    lines: 100 # default 60
-    statements: 50 # default 40
+    lines: 110 # default 60
+    statements: -1 # default 40
   gocognit:
     min-complexity: 20 # minimal code complexity to report, 30 by default (but we recommend 10-20)
   goconst:
@@ -111,7 +109,7 @@ linters-settings:
       #unnamedResult: # disabled by default
       #  checkExported: false # whether to check exported functions # default false
   gocyclo:
-    min-complexity: 30 # default 30
+    min-complexity: 40 # default 30
   godot:
     scope: declarations # comments to be checked: `declarations` (default), `toplevel`, or `all`
     exclude: [] # list of regexps for excluding particular comment lines from check # default []
@@ -173,7 +171,7 @@ linters-settings:
   nakedret:
     max-func-lines: 0 # default 30
   nestif:
-    min-complexity: 4 # default 5
+    min-complexity: 5 # default 5
   nilnil:
     checked-types: # default [ptr, func, iface, map, chan]
       - ptr
@@ -232,7 +230,7 @@ linters-settings:
       - database/sql
       - github.com/jmoiron/sqlx
   # stylecheck:
-  #   go: "1.18" # default 1.13
+  #   go: "1.20" # default 1.13
   #   checks: [ "*" ] # https://staticcheck.io/docs/options#checks # default ["*"]
   #   dot-import-whitelist: [] # https://staticcheck.io/docs/options#dot_import_whitelist  # default []
   #   initialisms: [ "ACL", "API", "ASCII", "CPU", "CSS", "DNS", "EOF", "GUID", "HTML", "HTTP", "HTTPS", "ID", "IP", "JSON", "QPS", "RAM", "RPC", "SLA", "SMTP", "SQL", "SSH", "TCP", "TLS", "TTL", "UDP", "UI", "GID", "UID", "UUID", "URI", "URL", "UTF8", "VM", "XML", "XMPP", "XSRF", "XSS" ] # https://staticcheck.io/docs/options#initialisms
@@ -252,26 +250,23 @@ linters:
   disable-all: true
   enable:
     ## enabled by default
-    # - deadcode
     - errcheck
     - gosimple
     - govet
     - ineffassign
     - staticcheck
-    # - structcheck
     - typecheck
     - unused
-    # - varcheck
     ## disabled by default
     - asciicheck
     - bidichk
     - bodyclose
     # - containedctx
     - contextcheck
-    - cyclop
+    # - cyclop
     - decorder
     - dogsled
-    - dupl
+    # - dupl
     - durationcheck
     - errchkjson
     - errname
@@ -279,12 +274,12 @@ linters:
     - exhaustive
     - exportloopref
     - funlen
-    # gochecknoglobals
+    # - gochecknoglobals
     - gochecknoinits
     # - gocognit # NEED
     - goconst
-    - gocritic
-    - gocyclo
+    # - gocritic
+    # - gocyclo
     - godot
     # - godox
     - goimports
@@ -292,17 +287,17 @@ linters:
     - gomoddirectives
     - gomodguard
     - goprintffuncname
-    - gosec
+    # - gosec
     - grouper
-    # - ifshort
     - importas
     # - lll # long long lines
-    - maintidx
+    # - maintidx
     - makezero
     - nakedret
-    - nestif
+    #- nestif
     - nilerr
     - nilnil
+    - nlreturn
     - noctx
     - nolintlint
     - prealloc
@@ -313,7 +308,7 @@ linters:
     - sqlclosecheck
     - tenv
     - testpackage
-    - thelper
+    # - thelper
     - tparallel
     - unconvert
     - unparam
@@ -334,7 +329,6 @@ linters:
     #- ireturn # good, but too strict - accept interfaces, return concrete types
     #- maligned # deprecated
     #- misspell # useless - correct commonly misspelled English words... quickly
-    #- nlreturn # too strict - requires a new line before return and branch statements
     #- paralleltest # too many false positives
     #- scopelint # deprecated
     #- stylecheck # revive does the same

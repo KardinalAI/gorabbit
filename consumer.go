@@ -66,6 +66,7 @@ func (mh MQTTMessageHandlers) matchesPrefixWildcard(storedWords, words []string)
 		if w == storedWords[compareIndex] {
 			// We can now start comparing at 'i'.
 			wordIdx = i
+
 			break
 		}
 	}
@@ -110,6 +111,7 @@ func (mh MQTTMessageHandlers) matchesSuffixWildcard(storedWords, words []string)
 	for i, w := range words {
 		if w == storedWords[compareIndex] {
 			wordIdx = i
+
 			break
 		}
 	}

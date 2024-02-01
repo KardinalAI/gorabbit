@@ -136,6 +136,7 @@ func newManagerFromOptions(options *ManagerOptions) (MQTTManager, error) {
 		switch disabledOverride {
 		case "1", "true":
 			manager.disabled = true
+
 			return manager, nil
 		}
 	}

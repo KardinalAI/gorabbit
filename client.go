@@ -127,6 +127,7 @@ func newClientFromOptions(options *ClientOptions) MQTTClient {
 		switch disabledOverride {
 		case "1", "true":
 			client.disabled = true
+
 			return client
 		}
 	}
