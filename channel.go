@@ -354,6 +354,7 @@ func (c *amqpChannel) consume() {
 	// If the channel is not ready, we cannot consume.
 	if !c.ready() {
 		c.logger.Warn("Channel not ready, cannot launch consumer")
+
 		return
 	}
 
