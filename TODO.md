@@ -8,6 +8,10 @@ Must have or Nice to have features.
 - [ ] Send messages with a TTL
 - [ ] Send messages with a definable header
 
+## Nice to have
+
+- [ ] Example projects for consumers and producers
+
 ## To Revisit/Rethink
 
 - [ ] Review the `publishingCache` in `channel.go`
