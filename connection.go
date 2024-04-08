@@ -66,7 +66,16 @@ func newConsumerConnection(ctx context.Context, uri string, keepAlive bool, retr
 //   - publishingCacheSize defines the maximum length of failed publishing cache.
 //   - publishingCacheTTL defines the time to live for failed publishing in cache.
 //   - logger is the parent logger.
-func newPublishingConnection(ctx context.Context, uri string, keepAlive bool, retryDelay time.Duration, maxRetry uint, publishingCacheSize uint64, publishingCacheTTL time.Duration, logger logger) *amqpConnection {
+func newPublishingConnection(
+	ctx context.Context,
+	uri string,
+	keepAlive bool,
+	retryDelay time.Duration,
+	maxRetry uint,
+	publishingCacheSize uint64,
+	publishingCacheTTL time.Duration,
+	logger logger,
+) *amqpConnection {
 	conn := newConnection(ctx, uri, keepAlive, retryDelay, logger, connectionTypePublisher)
 
 	conn.maxRetry = maxRetry
@@ -278,7 +287,7 @@ func (a *amqpConnection) registerConsumer(consumer MessageConsumer) error {
 	return nil
 }
 
-func (a *amqpConnection) publish(exchange, routingKey string, payload []byte, options *publishingOptions) error {
+func (a *amqpConnection) publish(exchange, routingKey string, payload []byte, options *PublishingOptions) error {
 	publishingChannel := a.channels.publishingChannel()
 	if publishingChannel == nil {
 		publishingChannel = newPublishingChannel(a.ctx, a.connection, a.keepAlive, a.retryDelay, a.maxRetry, a.publishingCacheSize, a.publishingCacheTTL, a.logger)

@@ -87,7 +87,14 @@ type amqpChannel struct {
 //   - consumer is the MessageConsumer that will hold consumption information.
 //   - maxRetry is the retry header for each message.
 //   - logger is the parent logger.
-func newConsumerChannel(ctx context.Context, connection *amqp.Connection, keepAlive bool, retryDelay time.Duration, consumer *MessageConsumer, logger logger) *amqpChannel {
+func newConsumerChannel(
+	ctx context.Context,
+	connection *amqp.Connection,
+	keepAlive bool,
+	retryDelay time.Duration,
+	consumer *MessageConsumer,
+	logger logger,
+) *amqpChannel {
 	channel := &amqpChannel{
 		ctx:        ctx,
 		connection: connection,
@@ -134,7 +141,16 @@ func newConsumerChannel(ctx context.Context, connection *amqp.Connection, keepAl
 //   - publishingCacheSize is the maximum cache size of failed publishing.
 //   - publishingCacheTTL defines the time to live for each failed publishing that was put in cache.
 //   - logger is the parent logger.
-func newPublishingChannel(ctx context.Context, connection *amqp.Connection, keepAlive bool, retryDelay time.Duration, maxRetry uint, publishingCacheSize uint64, publishingCacheTTL time.Duration, logger logger) *amqpChannel {
+func newPublishingChannel(
+	ctx context.Context,
+	connection *amqp.Connection,
+	keepAlive bool,
+	retryDelay time.Duration,
+	maxRetry uint,
+	publishingCacheSize uint64,
+	publishingCacheTTL time.Duration,
+	logger logger,
+) *amqpChannel {
 	channel := &amqpChannel{
 		ctx:        ctx,
 		connection: connection,
@@ -450,6 +466,8 @@ func (c *amqpChannel) processDelivery(delivery *amqp.Delivery) {
 }
 
 // retryDelivery processes a delivery retry based on its redelivery header.
+//
+//nolint:gocognit // We can allow the current complexity for now but we should revisit it later.
 func (c *amqpChannel) retryDelivery(delivery *amqp.Delivery, alreadyAcknowledged bool) {
 	c.logger.Debug("Delivery retry launched")
 
@@ -534,7 +552,7 @@ func (c *amqpChannel) retryDelivery(delivery *amqp.Delivery, alreadyAcknowledged
 }
 
 // publish will publish a message with the given configuration.
-func (c *amqpChannel) publish(exchange string, routingKey string, payload []byte, options *publishingOptions) error {
+func (c *amqpChannel) publish(exchange string, routingKey string, payload []byte, options *PublishingOptions) error {
 	publishing := &amqp.Publishing{
 		ContentType:  "application/json",
 		Body:         payload,
@@ -585,7 +603,11 @@ func (c *amqpChannel) publish(exchange string, routingKey string, payload []byte
 
 		// If the exchange does not exist yet, we want to force a release log with a warning for better visibility.
 		if isErrorNotFound(err) {
-			c.releaseLogger.Warn("The MQTT message was not sent, exchange does not exist", logField{Key: "exchange", Value: exchange}, logField{Key: "routingKey", Value: routingKey})
+			c.releaseLogger.Warn(
+				"The MQTT message was not sent, exchange does not exist",
+				logField{Key: "exchange", Value: exchange},
+				logField{Key: "routingKey", Value: routingKey},
+			)
 		}
 
 		return err

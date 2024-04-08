@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/KardinalAI/gorabbit/v1"
+	"github.com/KardinalAI/gorabbit"
 )
 
 func TestMQTTMessageHandlers_Validate(t *testing.T) {
@@ -16,59 +16,59 @@ func TestMQTTMessageHandlers_Validate(t *testing.T) {
 	}{
 		{
 			handlers: gorabbit.MQTTMessageHandlers{
-				"event.user.#":            func(payload []byte) error { return nil },
-				"event.email.*.generated": func(payload []byte) error { return nil },
-				"event.*.space.boom":      func(payload []byte) error { return nil },
-				"*.toto.order.passed":     func(payload []byte) error { return nil },
-				"#.toto":                  func(payload []byte) error { return nil },
+				"event.user.#":            func(_ []byte) error { return nil },
+				"event.email.*.generated": func(_ []byte) error { return nil },
+				"event.*.space.boom":      func(_ []byte) error { return nil },
+				"*.toto.order.passed":     func(_ []byte) error { return nil },
+				"#.toto":                  func(_ []byte) error { return nil },
 			},
 			expectedError: nil,
 		},
 		{
 			handlers: gorabbit.MQTTMessageHandlers{
-				"": func(payload []byte) error { return nil },
+				"": func(_ []byte) error { return nil },
 			},
 			expectedError: errors.New("a routing key cannot be empty"),
 		},
 		{
 			handlers: gorabbit.MQTTMessageHandlers{
-				" ": func(payload []byte) error { return nil },
+				" ": func(_ []byte) error { return nil },
 			},
 			expectedError: errors.New("a routing key cannot contain spaces"),
 		},
 		{
 			handlers: gorabbit.MQTTMessageHandlers{
-				"#": func(payload []byte) error { return nil },
+				"#": func(_ []byte) error { return nil },
 			},
 			expectedError: errors.New("a routing key cannot be the wildcard '#'"),
 		},
 		{
 			handlers: gorabbit.MQTTMessageHandlers{
-				"toto.#.titi": func(payload []byte) error { return nil },
+				"toto.#.titi": func(_ []byte) error { return nil },
 			},
 			expectedError: errors.New("the wildcard '#' in the routing key 'toto.#.titi' is not allowed"),
 		},
 		{
 			handlers: gorabbit.MQTTMessageHandlers{
-				"toto titi": func(payload []byte) error { return nil },
+				"toto titi": func(_ []byte) error { return nil },
 			},
 			expectedError: errors.New("a routing key cannot contain spaces"),
 		},
 		{
 			handlers: gorabbit.MQTTMessageHandlers{
-				"toto..titi": func(payload []byte) error { return nil },
+				"toto..titi": func(_ []byte) error { return nil },
 			},
 			expectedError: errors.New("the routing key 'toto..titi' is not properly formatted"),
 		},
 		{
 			handlers: gorabbit.MQTTMessageHandlers{
-				".toto.titi": func(payload []byte) error { return nil },
+				".toto.titi": func(_ []byte) error { return nil },
 			},
 			expectedError: errors.New("the routing key '.toto.titi' is not properly formatted"),
 		},
 		{
 			handlers: gorabbit.MQTTMessageHandlers{
-				"toto.titi.": func(payload []byte) error { return nil },
+				"toto.titi.": func(_ []byte) error { return nil },
 			},
 			expectedError: errors.New("the routing key 'toto.titi.' is not properly formatted"),
 		},
@@ -83,11 +83,11 @@ func TestMQTTMessageHandlers_Validate(t *testing.T) {
 
 func TestMQTTMessageHandlers_FindFunc(t *testing.T) {
 	handlers := gorabbit.MQTTMessageHandlers{
-		"event.user.#":            func(payload []byte) error { return nil },
-		"event.email.*.generated": func(payload []byte) error { return nil },
-		"event.*.space.boom":      func(payload []byte) error { return nil },
-		"*.toto.order.passed":     func(payload []byte) error { return nil },
-		"#.toto":                  func(payload []byte) error { return nil },
+		"event.user.#":            func(_ []byte) error { return nil },
+		"event.email.*.generated": func(_ []byte) error { return nil },
+		"event.*.space.boom":      func(_ []byte) error { return nil },
+		"*.toto.order.passed":     func(_ []byte) error { return nil },
+		"#.toto":                  func(_ []byte) error { return nil },
 	}
 
 	tests := []struct {

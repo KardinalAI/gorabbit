@@ -33,7 +33,7 @@ We welcome contributions in the form of pull requests. If you want to contribute
 1. Fork the repository and create your branch from `v1`.
 2. Make sure your code adheres to the [Go coding standards](https://golang.org/doc/effective_go).
 3. Make sure your code respects all [linting rules](./.golangci.yml) using [golangci-lint](https://golangci-lint.run/)
-   version 1.52.2.
+   version 1.57.2.
 4. Write clear commit messages and include documentation if necessary.
 5. Make sure your code passes the existing tests.
 6. Open a pull request, providing a clear description of your changes.

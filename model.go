@@ -54,39 +54,39 @@ type BindingConfig struct {
 	Exchange   string `yaml:"exchange"`
 }
 
-type publishingOptions struct {
-	messagePriority *MessagePriority
-	deliveryMode    *DeliveryMode
+type PublishingOptions struct {
+	MessagePriority *MessagePriority
+	DeliveryMode    *DeliveryMode
 }
 
-func SendOptions() *publishingOptions {
-	return &publishingOptions{}
+func SendOptions() *PublishingOptions {
+	return &PublishingOptions{}
 }
 
-func (m *publishingOptions) priority() uint8 {
-	if m.messagePriority == nil {
+func (m *PublishingOptions) priority() uint8 {
+	if m.MessagePriority == nil {
 		return PriorityMedium.Uint8()
 	}
 
-	return m.messagePriority.Uint8()
+	return m.MessagePriority.Uint8()
 }
 
-func (m *publishingOptions) mode() uint8 {
-	if m.deliveryMode == nil {
+func (m *PublishingOptions) mode() uint8 {
+	if m.DeliveryMode == nil {
 		return Persistent.Uint8()
 	}
 
-	return m.deliveryMode.Uint8()
+	return m.DeliveryMode.Uint8()
 }
 
-func (m *publishingOptions) SetPriority(priority MessagePriority) *publishingOptions {
-	m.messagePriority = &priority
+func (m *PublishingOptions) SetPriority(priority MessagePriority) *PublishingOptions {
+	m.MessagePriority = &priority
 
 	return m
 }
 
-func (m *publishingOptions) SetMode(mode DeliveryMode) *publishingOptions {
-	m.deliveryMode = &mode
+func (m *PublishingOptions) SetMode(mode DeliveryMode) *PublishingOptions {
+	m.DeliveryMode = &mode
 
 	return m
 }

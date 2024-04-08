@@ -29,7 +29,7 @@ type MQTTClient interface {
 	//	- payload is the object you want to send as a byte array.
 	// Optionally you can add publishingOptions for extra customization.
 	// Returns an error if the connection to the RabbitMQ server is down.
-	PublishWithOptions(exchange, routingKey string, payload interface{}, options *publishingOptions) error
+	PublishWithOptions(exchange, routingKey string, payload interface{}, options *PublishingOptions) error
 
 	// RegisterConsumer will register a MessageConsumer for internal queue subscription and message processing.
 	// The MessageConsumer will hold a list of MQTTMessageHandlers to internalize message processing.
@@ -171,7 +171,7 @@ func (client *mqttClient) Publish(exchange string, routingKey string, payload in
 	return client.PublishWithOptions(exchange, routingKey, payload, nil)
 }
 
-func (client *mqttClient) PublishWithOptions(exchange string, routingKey string, payload interface{}, options *publishingOptions) error {
+func (client *mqttClient) PublishWithOptions(exchange string, routingKey string, payload interface{}, options *PublishingOptions) error {
 	// client is disabled, so we do nothing and return no error.
 	if client.disabled {
 		return nil

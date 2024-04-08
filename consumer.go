@@ -13,6 +13,8 @@ type MQTTMessageHandlers map[string]MQTTMessageHandlerFunc
 type MQTTMessageHandlerFunc func(payload []byte) error
 
 // Validate verifies that all routing keys in the handlers are properly formatted and allowed.
+//
+//nolint:gocognit // We can allow the current complexity for now but we should revisit it later.
 func (mh MQTTMessageHandlers) Validate() error {
 	for k := range mh {
 		// A routing key cannot be empty.

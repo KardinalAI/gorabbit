@@ -69,7 +69,7 @@ func (c *connectionManager) registerConsumer(consumer MessageConsumer) error {
 	return c.consumerConnection.registerConsumer(consumer)
 }
 
-func (c *connectionManager) publish(exchange, routingKey string, payload interface{}, options *publishingOptions) error {
+func (c *connectionManager) publish(exchange, routingKey string, payload interface{}, options *PublishingOptions) error {
 	if c.publisherConnection == nil {
 		return errPublisherConnectionNotInitialized
 	}

@@ -48,7 +48,7 @@ This wrapper depends on the official [Go RabbitMQ plugin](https://github.com/rab
 ### Go module
 
 ```bash
-go get github.com/KardinalAI/gorabbit/v1
+go get github.com/KardinalAI/gorabbit
 ```
 
 ### Environment variables
