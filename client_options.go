@@ -109,6 +109,7 @@ func NewClientOptionsFromEnv() *ClientOptions {
 	}
 
 	defaultOpts.UseTLS = fromEnv.UseTLS
+	defaultOpts.ConnectionName = fromEnv.ConnectionName
 
 	return defaultOpts
 }

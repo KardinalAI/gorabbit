@@ -29,6 +29,10 @@ func newConnectionManager(
 	logger logger,
 	marshaller Marshaller,
 ) *connectionManager {
+	if connectionName == "" {
+		connectionName = libraryName
+	}
+
 	c := &connectionManager{
 		consumerConnection: newConsumerConnection(
 			ctx, uri, connectionName, keepAlive, retryDelay, logger, marshaller,

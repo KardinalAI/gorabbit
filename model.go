@@ -121,10 +121,11 @@ func (m mqttPublishing) HashCode() string {
 }
 
 type RabbitMQEnvs struct {
-	Host     string `env:"RABBITMQ_HOST"`
-	Port     uint   `env:"RABBITMQ_PORT"`
-	Username string `env:"RABBITMQ_USERNAME"`
-	Password string `env:"RABBITMQ_PASSWORD"`
-	Vhost    string `env:"RABBITMQ_VHOST"`
-	UseTLS   bool   `env:"RABBITMQ_USE_TLS"`
+	Host           string `env:"RABBITMQ_HOST"`
+	Port           uint   `env:"RABBITMQ_PORT"`
+	Username       string `env:"RABBITMQ_USERNAME"`
+	Password       string `env:"RABBITMQ_PASSWORD"`
+	Vhost          string `env:"RABBITMQ_VHOST"`
+	UseTLS         bool   `env:"RABBITMQ_USE_TLS"`
+	ConnectionName string `env:"RABBITMQ_CONNECTION_NAME"`
 }

@@ -97,6 +97,7 @@ parameter.
 | Password            | The plain authentication password                             | guest         |
 | Vhost               | The specific vhost to use when connection to CloudAMQP        |               |
 | UseTLS              | The flag that activates the use of TLS (amqps)                | false         |
+| ConnectionName      | The desired connection name                                   | Gorabbit      |
 | KeepAlive           | The flag that activates retry and re-connect mechanisms       | true          |
 | RetryDelay          | The delay between each retry and re-connection                | 3 seconds     |
 | MaxRetry            | The max number of message retry if it failed to process       | 5             |
@@ -142,6 +143,7 @@ Here are the following supported environment variables:
 * `RABBITMQ_PASSWORD`: Defines the password,
 * `RABBITMQ_VHOST`: Defines the vhost,
 * `RABBITMQ_USE_TLS`: Defines whether to use TLS or no.
+* `RABBITMQ_CONNECTION_NAME`: Defines the desired connection name.
 
 **Note that environment variables are all optional, so missing keys will be replaced by their corresponding default.**
 

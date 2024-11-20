@@ -2,9 +2,11 @@ package gorabbit
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"time"
 
+	"github.com/google/uuid"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -70,6 +72,8 @@ func newConsumerConnection(
 	logger logger,
 	marshaller Marshaller,
 ) *amqpConnection {
+	connectionName = fmt.Sprintf("%s-consumer-%s", connectionName, uuid.NewString())
+
 	return newConnection(ctx, uri, connectionName, keepAlive, retryDelay, logger, connectionTypeConsumer, marshaller)
 }
 
@@ -96,6 +100,8 @@ func newPublishingConnection(
 	logger logger,
 	marshaller Marshaller,
 ) *amqpConnection {
+	connectionName = fmt.Sprintf("%s-publisher-%s", connectionName, uuid.NewString())
+
 	conn := newConnection(ctx, uri, connectionName, keepAlive, retryDelay, logger, connectionTypePublisher, marshaller)
 
 	conn.maxRetry = maxRetry
