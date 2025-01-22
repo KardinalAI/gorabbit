@@ -1,3 +1,7 @@
+# 1.1.2
+
+- Allow sending messages with a TTL via `PublishWithOptions` by adding a new `TTL` property in `PublishingOptions` ([PR](https://github.com/KardinalAI/gorabbit/pull/19)).
+
 # 1.1.1
 
 - Minor fix for correct usage of the `ConnectionName` parameter, and the possibility to declare it via environment variables ([PR](https://github.com/KardinalAI/gorabbit/pull/18)).
