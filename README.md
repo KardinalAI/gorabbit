@@ -219,12 +219,13 @@ type foo struct {
 err := client.Publish("events_exchange", "event.foo.bar.created", foo{Action: "bar"})
 ```
 
-Optionally, you can set the message's `Priority` and `DeliveryMode` via the `PublishWithOptions` method.
+Optionally, you can set the message's `Priority`, `DeliveryMode` and `Expiration` via the `PublishWithOptions` method.
 
 ```go
 options := gorabbit.SendOptions().
     SetPriority(gorabbit.PriorityMedium).
-    SetDeliveryMode(gorabbit.Persistent)
+    SetDeliveryMode(gorabbit.Persistent).
+	SetTTL(5*time.Second)
 
 err := client.PublishWithOptions("events_exchange", "event.foo.bar.created", "foo string", options)
 ```
