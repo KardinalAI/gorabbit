@@ -1,6 +1,9 @@
 package gorabbit
 
 import (
+	"strconv"
+	"time"
+
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -58,6 +61,7 @@ type BindingConfig struct {
 type PublishingOptions struct {
 	MessagePriority *MessagePriority
 	DeliveryMode    *DeliveryMode
+	TTL             *time.Duration
 }
 
 func SendOptions() *PublishingOptions {
@@ -80,6 +84,14 @@ func (m *PublishingOptions) mode() uint8 {
 	return m.DeliveryMode.Uint8()
 }
 
+func (m *PublishingOptions) ttl() string {
+	if m.TTL == nil {
+		return ""
+	}
+
+	return strconv.FormatInt(m.TTL.Milliseconds(), 10)
+}
+
 func (m *PublishingOptions) SetPriority(priority MessagePriority) *PublishingOptions {
 	m.MessagePriority = &priority
 
@@ -88,6 +100,12 @@ func (m *PublishingOptions) SetPriority(priority MessagePriority) *PublishingOpt
 
 func (m *PublishingOptions) SetMode(mode DeliveryMode) *PublishingOptions {
 	m.DeliveryMode = &mode
+
+	return m
+}
+
+func (m *PublishingOptions) SetTTL(ttl time.Duration) *PublishingOptions {
+	m.TTL = &ttl
 
 	return m
 }

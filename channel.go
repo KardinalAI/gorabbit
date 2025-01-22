@@ -579,6 +579,7 @@ func (c *amqpChannel) publish(exchange string, routingKey string, payload []byte
 	if options != nil {
 		publishing.Priority = options.priority()
 		publishing.DeliveryMode = options.mode()
+		publishing.Expiration = options.ttl()
 	}
 
 	// If the channel is not ready, we cannot publish, but we send the message to cache if the keepAlive flag is set to true.

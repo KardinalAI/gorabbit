@@ -5,7 +5,7 @@ Must have or Nice to have features.
 ## Must Haves
 
 - [ ] Unregister consumer via a `UnregisterConsumer`
-- [ ] Send messages with a TTL
+- [x] ~~Send messages with a TTL~~
 - [ ] Send messages with a definable header
 
 ## Nice to have
@@ -17,3 +17,8 @@ Must have or Nice to have features.
 - [ ] Review the `publishingCache` in `channel.go`
 - [ ] Review the logger
 - [ ] Review the linter and redefine some rules if they are too strict
+
+## To Fix
+
+- [ ] Concurrent consumption throwing errors when `PrefetchSize` is set
+- [ ] Consumer wildcard validator does not match all possibilities
