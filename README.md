@@ -225,7 +225,7 @@ Optionally, you can set the message's `Priority`, `DeliveryMode` and `Expiration
 options := gorabbit.SendOptions().
     SetPriority(gorabbit.PriorityMedium).
     SetDeliveryMode(gorabbit.Persistent).
-	SetTTL(5*time.Second)
+    SetTTL(5*time.Second)
 
 err := client.PublishWithOptions("events_exchange", "event.foo.bar.created", "foo string", options)
 ```
