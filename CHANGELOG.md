@@ -1,3 +1,7 @@
+# 1.1.3
+
+- Allow the deletion of a binding between an exchange and a queue, with `MQTTManager.UnbindExchangeFromQueueViaRoutingKey()`.
+
 # 1.1.2
 
 - Allow sending messages with a TTL via `PublishWithOptions` by adding a new `TTL` property in `PublishingOptions` ([PR](https://github.com/KardinalAI/gorabbit/pull/19)).
