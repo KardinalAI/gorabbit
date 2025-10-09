@@ -8,40 +8,46 @@ Gorabbit is a wrapper that provides high level and robust RabbitMQ operations th
 
 This wrapper depends on the official [Go RabbitMQ plugin](https://github.com/rabbitmq/amqp091-go).
 
-* [Installation](#installation)
-    * [Go Module](#go-module)
-    * [Environment Variables](#environment-variables)
-* [Always On Mechanism](#always-on-mechanism)
-* [Client](#client)
-    * [Initialization](#client-initialization)
-    * [Options](#client-options)
-    * [Default Options](#client-with-default-options)
-    * [Custom Options](#client-with-custom-options)
-        * [Builder](#client-options-using-the-builder)
-        * [Struct](#client-options-using-struct-initialization)
-    * [Disconnection](#client-disconnection)
-    * [Publishing](#publishing)
-    * [Consuming](#consuming)
-    * [Ready and Health Checks](#ready-and-health-checks)
-* [Manager](#manager)
-    * [Initialization](#manager-initialization)
-    * [Options](#manager-options)
-    * [Default Options](#manager-with-default-options)
-    * [Custom Options](#manager-with-custom-options)
-        * [Builder](#manager-options-using-the-builder)
-        * [Struct](#manager-options-using-struct-initialization)
-    * [Disconnection](#manager-disconnection)
-    * [Operations](#manager-operations)
-        * [Exchange Creation](#exchange-creation)
-        * [Queue Creation](#queue-creation)
-        * [Binding Creation](#binding-creation)
-        * [Message Count](#queue-messages-count)
-        * [Push Message](#push-message)
-        * [Pop Message](#pop-message)
-        * [Purge Queue](#purge-queue)
-        * [Delete Queue](#delete-queue)
-        * [Delete Exchange](#delete-exchange)
-        * [Setup From Definitions](#setup-from-schema-definition-file)
+- [Gorabbit](#gorabbit)
+  - [Installation](#installation)
+    - [Go module](#go-module)
+    - [Environment variables](#environment-variables)
+  - [Always-on mechanism](#always-on-mechanism)
+  - [Client](#client)
+    - [Client initialization](#client-initialization)
+    - [Client options](#client-options)
+    - [Client with default options](#client-with-default-options)
+    - [Client with options from environment variables](#client-with-options-from-environment-variables)
+    - [Client with custom options](#client-with-custom-options)
+      - [Client options using the builder](#client-options-using-the-builder)
+      - [Client options using struct initialization](#client-options-using-struct-initialization)
+    - [Client disconnection](#client-disconnection)
+    - [Publishing](#publishing)
+    - [Consuming](#consuming)
+    - [Ready and Health checks](#ready-and-health-checks)
+  - [Manager](#manager)
+    - [Manager initialization](#manager-initialization)
+    - [Manager options](#manager-options)
+    - [Manager with default options](#manager-with-default-options)
+    - [Manager with options from environment variables](#manager-with-options-from-environment-variables)
+    - [Manager with custom options](#manager-with-custom-options)
+      - [Manager options using the builder](#manager-options-using-the-builder)
+      - [Manager options using struct initialization](#manager-options-using-struct-initialization)
+    - [Manager disconnection](#manager-disconnection)
+    - [Manager operations](#manager-operations)
+      - [Exchange creation](#exchange-creation)
+      - [Queue creation](#queue-creation)
+      - [Binding creation](#binding-creation)
+      - [Queue messages count](#queue-messages-count)
+      - [Push message](#push-message)
+      - [Pop message](#pop-message)
+      - [Delete binding](#delete-binding)
+      - [Purge queue](#purge-queue)
+      - [Delete queue](#delete-queue)
+      - [Delete exchange](#delete-exchange)
+      - [Setup from schema definition file](#setup-from-schema-definition-file)
+  - [Launch Local RabbitMQ Server](#launch-local-rabbitmq-server)
+  - [License](#license)
 
 ## Installation
 
@@ -473,6 +479,14 @@ Retrieves a single message from a given queue and auto acknowledges it if `autoA
 
 ```go
 message, err := manager.PopMessageFromQueue("events_queue", true)
+```
+
+#### Delete binding
+
+Deletes a binding.
+
+```go
+err := manager.UnbindExchangeFromQueueViaRoutingKey("events_exchange", "events_queue", "event.foo.bar.created")
 ```
 
 #### Purge queue
