@@ -471,6 +471,78 @@ func (suite *ManagerTestSuite) TestBindExchangeToQueueViaRoutingKey() {
 	require.NoError(t, manager.Disconnect())
 }
 
+func (suite *ManagerTestSuite) TestUnbindExchangeFromQueueViaRoutingKey() {
+	t := suite.T()
+
+	t.Setenv("RABBITMQ_HOST", suite.rabbitMQContainer.ContainerHost)
+	t.Setenv("RABBITMQ_PORT", strconv.Itoa(int(suite.rabbitMQContainer.ContainerPort)))
+	t.Setenv("RABBITMQ_USERNAME", suite.rabbitMQContainer.Username)
+	t.Setenv("RABBITMQ_PASSWORD", suite.rabbitMQContainer.Password)
+
+	manager, err := gorabbit.NewManagerFromEnv()
+
+	require.NoError(t, err)
+	assert.NotNil(t, manager)
+
+	queueConfig := gorabbit.QueueConfig{
+		Name:      "test_queue",
+		Durable:   true,
+		Exclusive: false,
+	}
+
+	err = manager.CreateQueue(queueConfig)
+
+	require.NoError(t, err)
+
+	exchangeConfig := gorabbit.ExchangeConfig{
+		Name: "test_exchange",
+		Type: "topic",
+	}
+
+	err = manager.CreateExchange(exchangeConfig)
+
+	require.NoError(t, err)
+
+	err = manager.BindExchangeToQueueViaRoutingKey(exchangeConfig.Name, queueConfig.Name, "routing_key")
+
+	require.NoError(t, err)
+
+	t.Run("Unbinding existing exchange from existing queue via routing key", func(t *testing.T) {
+		err = manager.UnbindExchangeFromQueueViaRoutingKey(exchangeConfig.Name, queueConfig.Name, "routing_key")
+
+		require.NoError(t, err)
+	})
+
+	t.Run("Unbinding again existing exchange from existing queue via routing key", func(t *testing.T) {
+		err = manager.UnbindExchangeFromQueueViaRoutingKey(exchangeConfig.Name, queueConfig.Name, "routing_key")
+
+		require.NoError(t, err)
+	})
+
+	t.Run("Unbinding existing exchange from existing queue via unknown routing key", func(t *testing.T) {
+		err = manager.UnbindExchangeFromQueueViaRoutingKey(exchangeConfig.Name, queueConfig.Name, "unk_routing_key")
+
+		require.NoError(t, err)
+	})
+
+	t.Run("Unbinding non-existing exchange from existing queue via routing key", func(t *testing.T) {
+		err = manager.UnbindExchangeFromQueueViaRoutingKey("non_existing_exchange", queueConfig.Name, "routing_key")
+
+		require.NoError(t, err)
+	})
+
+	t.Run("Unbinding existing exchange from non-existing queue via routing key", func(t *testing.T) {
+		err = manager.UnbindExchangeFromQueueViaRoutingKey(exchangeConfig.Name, "non_existing_queue", "routing_key")
+
+		require.NoError(t, err)
+	})
+
+	require.NoError(t, manager.DeleteQueue(exchangeConfig.Name))
+	require.NoError(t, manager.DeleteQueue(queueConfig.Name))
+
+	require.NoError(t, manager.Disconnect())
+}
+
 func (suite *ManagerTestSuite) TestGetNumberOfMessages() {
 	t := suite.T()
 
@@ -565,17 +637,37 @@ func (suite *ManagerTestSuite) TestPushMessageToExchange() {
 
 		require.NoError(t, err)
 
+		// Push message when the binding exists
 		err = manager.PushMessageToExchange(exchangeConfig.Name, "routing_key", "Some message")
+
+		require.NoError(t, err)
 
 		// Small sleep for allowing message to be sent.
 		time.Sleep(50 * time.Millisecond)
-
-		require.NoError(t, err)
 
 		count, countErr := manager.GetNumberOfMessages(queueConfig.Name)
 
 		require.NoError(t, countErr)
 		assert.Equal(t, 1, count)
+
+		require.NoError(t, manager.PurgeQueue(queueConfig.Name))
+
+		err = manager.UnbindExchangeFromQueueViaRoutingKey(exchangeConfig.Name, queueConfig.Name, "routing_key")
+
+		require.NoError(t, err)
+
+		// Push message when the binding no longer exists
+		err = manager.PushMessageToExchange(exchangeConfig.Name, "routing_key", "Some message")
+
+		require.NoError(t, err)
+
+		// Small sleep for allowing message to be sent.
+		time.Sleep(50 * time.Millisecond)
+
+		count, countErr = manager.GetNumberOfMessages(queueConfig.Name)
+
+		require.NoError(t, countErr)
+		assert.Zero(t, count)
 
 		require.NoError(t, manager.PurgeQueue(queueConfig.Name))
 
@@ -591,10 +683,10 @@ func (suite *ManagerTestSuite) TestPushMessageToExchange() {
 	t.Run("Pushing message to non-existing exchange should still work", func(t *testing.T) {
 		err = manager.PushMessageToExchange("non_existing_exchange", "routing_key", "Some message")
 
+		require.NoError(t, err)
+
 		// Small sleep for allowing message to be sent.
 		time.Sleep(50 * time.Millisecond)
-
-		require.NoError(t, err)
 	})
 
 	require.NoError(t, manager.Disconnect())
@@ -639,10 +731,10 @@ func (suite *ManagerTestSuite) TestPopMessageFromQueue() {
 
 		err = manager.PushMessageToExchange(exchangeConfig.Name, "routing_key", "Some message")
 
+		require.NoError(t, err)
+
 		// Small sleep for allowing message to be sent.
 		time.Sleep(50 * time.Millisecond)
-
-		require.NoError(t, err)
 
 		count, countErr := manager.GetNumberOfMessages(queueConfig.Name)
 
