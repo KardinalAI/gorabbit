@@ -31,6 +31,10 @@ type MQTTManager interface {
 	// Returns an error if the connection to the RabbitMQ server is down or if the exchange or queue does not exist.
 	BindExchangeToQueueViaRoutingKey(exchange, queue, routingKey string) error
 
+	// UnbindExchangeFromQueueViaRoutingKey will unbind an exchange from a queue via a given routingKey.
+	// Returns an error if the connection to the RabbitMQ server is down.
+	UnbindExchangeFromQueueViaRoutingKey(exchange, queue, routingKey string) error
+
 	// GetNumberOfMessages retrieves the number of messages currently sitting in a given queue.
 	// Returns an error if the connection to the RabbitMQ server is down or the queue does not exist.
 	GetNumberOfMessages(queue string) (int, error)
@@ -284,6 +288,26 @@ func (manager *mqttManager) BindExchangeToQueueViaRoutingKey(exchange, queue, ro
 		routingKey,
 		exchange,
 		false,
+		nil,
+	)
+}
+
+func (manager *mqttManager) UnbindExchangeFromQueueViaRoutingKey(exchange, queue, routingKey string) error {
+	// Manager is disabled, so we do nothing and return no error.
+	if manager.disabled {
+		return nil
+	}
+
+	// If the manager is not ready, we return its error.
+	if ready, err := manager.ready(); !ready {
+		return err
+	}
+
+	// We unbind the queue from a given exchange and routing key via the channel.
+	return manager.channel.QueueUnbind(
+		queue,
+		routingKey,
+		exchange,
 		nil,
 	)
 }
