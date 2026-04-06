@@ -49,11 +49,14 @@ func newConnectionManager(
 
 // close offers the basic connection and channel close() mechanism but with extra higher level checks.
 func (c *connectionManager) close() error {
-	if err := c.publisherConnection.close(); err != nil {
-		return err
+	errPublisher := c.publisherConnection.close()
+	errConsumer := c.consumerConnection.close()
+
+	if errPublisher != nil {
+		return errPublisher
 	}
 
-	return c.consumerConnection.close()
+	return errConsumer
 }
 
 // isReady returns true if both consumerConnection and publishingConnection are ready.
